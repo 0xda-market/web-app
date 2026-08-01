@@ -1,0 +1,23 @@
+services:
+  web-app:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: zero-x-da-market-web-app:${RELEASE_SHA:-development}
+    container_name: zero-x-da-market-web-app-development
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${WEB_APP_PORT:-10002}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 10s
+    networks:
+      - edge
+
+networks:
+  edge:
+    external: true
+    name: zero-x-da-market-edge

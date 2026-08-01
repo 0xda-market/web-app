@@ -1,0 +1,13 @@
+{
+  "name": "@0xda-market/web-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/app.js && node --check src/telegram-host.js && node --check src/runtime.js"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

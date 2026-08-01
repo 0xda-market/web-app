@@ -1,10 +1,26 @@
 # 0xda-market Web App
 
-Embeddable web-interface core for the 0xda-market marketplace.
+Embeddable web interface for the 0xda-market marketplace.
 
-This repository is **not a standalone website** and does not own a public channel. It provides the reusable marketplace interface that a host application embeds and adapts for its environment.
+The repository owns reusable browser presentation and interaction logic. The first production host is Telegram Mini Apps; future standalone, messenger and native wrappers must reuse the same contracts rather than duplicate market logic.
 
-Initial hosts include the Telegram bot and a regular browser shell. Future messenger or native wrappers can integrate the same interface without duplicating the client and broker journeys.
+## Current vertical slice: Telegram
+
+```text
+web-app browser UI
+  -> Telegram host adapter
+  -> telegram-bot signed BFF
+  -> core WebApp engine and market API
+```
+
+Ownership boundaries:
+
+- `web-app` owns browser UI, responsive layout, local catalog navigation and host adapters;
+- `telegram-bot` owns Telegram SDK entry points, signed `initData` validation and Telegram-specific BFF routes;
+- `core` owns products, users, roles, catalog snapshots, quotes, orders, pricing and settlement contracts;
+- browser code never receives the Telegram bot token, `MARKET_API_TOKEN` or an internal market user UUID.
+
+The catalog is bootstrapped once per Mini App session. Search, category filtering, pagination and viewport changes operate on the immutable in-memory snapshot. Portrait shows six products, landscape twelve and wide landscape eighteen.
 
 ## Architectural role
 
@@ -14,51 +30,54 @@ The Web App owns shared presentation and interaction logic:
 - client purchase journeys;
 - broker offer creation and inventory management;
 - role-aware routing and screen composition;
-- form state, validation, localization, and responsive behavior;
+- form state, validation, localization and responsive behavior;
 - host-independent navigation and action contracts.
 
-The Web App does not own:
+The Web App does not own authentication, role assignment, persistent market records, pricing authority or settlement. Those responsibilities remain in host adapters and the provider-agnostic core.
 
-- user authentication or role assignment;
-- Telegram Bot API or any messenger SDK;
-- channel commands, keyboards, or notifications;
-- persistent product, offer, order, or payment records;
-- exchange-rate authority, pricing policy, or settlement.
+## Runtime contract
 
-Those responsibilities belong to the host adapter and the provider-agnostic core.
+The Telegram slice currently targets the public VPS route layout:
+
+- signed BFF: `/bot/webapp`
+- shared core browser engine: `/webapp-core/index.js`
+
+A deployment may override both before `src/app.js` loads:
+
+```html
+<script>
+  window.__ZERO_X_DA_MARKET__ = {
+    apiBaseUrl: "/bot/webapp",
+    webAppCoreUrl: "/webapp-core/index.js"
+  };
+</script>
+```
+
+The checkout flow requires a real Telegram Mini App session because every server request carries signed `Telegram.WebApp.initData`.
 
 ## Host contract
 
-A host embeds the Web App and supplies a verified session context containing:
+A host supplies verified session context, capabilities, locale, theme, viewport behavior, navigation primitives and authenticated API transport. Locale is presentation input, never authorization. Broker quote currency remains an explicit user choice.
 
-- internal user identity;
-- granted capabilities such as `can_buy`, `can_manage_offers`, and `can_administer`;
-- locale and suggested display currency;
-- theme and viewport information;
-- navigation, close, back, and external-action capabilities;
-- API transport and authentication.
+## Local validation
 
-The Web App never treats locale as authorization. It also never infers a broker's trading currency from locale. Locale may suggest an initial currency, but a broker explicitly selects the currency in which the offer is quoted.
+```sh
+npm test
+npm run check
+python3 -m http.server 8080
+```
 
-## Broker offer model
+## Rollout
 
-The first vertical slice is the broker flow without database persistence.
-
-A broker selects a real product from the shared catalog and enters:
-
-- quantity;
-- quoted amount;
-- quoted currency, initially suggested from locale but always editable;
-- optional validity period and local status.
-
-The local prototype stores the original broker quote as `amount + currency` and may calculate a provisional normalized USDT value for comparison. USDT is the marketplace accounting unit for broker-side comparison; client-facing currency is a separate presentation concern.
-
-Local state is intentionally replaceable. Moving to persistent offers must preserve the same interface contracts while replacing local storage with core-backed APIs.
+1. deploy this repository as the browser asset owner;
+2. route the Telegram menu button to its `index.html`;
+3. preserve `/bot/webapp/*` as the signed Telegram BFF;
+4. verify development catalog, quote, acceptance and order refresh flows;
+5. remove duplicated browser assets from `telegram-bot` only after verification;
+6. add the standalone host adapter without weakening Telegram authentication.
 
 ## Repository boundaries
 
-- [`0xda-market/core`](https://github.com/0xda-market/core) owns products, users, roles, offers, inventory, orders, pricing inputs, fulfillment, and settlement contracts.
-- [`0xda-market/telegram-bot`](https://github.com/0xda-market/telegram-bot) owns the Telegram host adapter, verified Telegram session, role-aware entry points, commands, and notifications.
+- [`0xda-market/core`](https://github.com/0xda-market/core) owns the provider-agnostic domain and API.
+- [`0xda-market/telegram-bot`](https://github.com/0xda-market/telegram-bot) owns the Telegram transport and signed BFF.
 - [`0xda-market/docs`](https://github.com/0xda-market/docs) owns cross-repository product and architecture documentation.
-
-The Web App remains reusable across hosts; each host adapter remains replaceable.

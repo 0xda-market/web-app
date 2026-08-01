@@ -1,0 +1,17 @@
+{
+  "name": "@0xda-market/web-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js",
+    "./contracts": "./src/contracts.js"
+  },
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/contracts.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

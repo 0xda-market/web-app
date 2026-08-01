@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-app-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check source
+        run: npm run check
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build static artifact
+        run: npm run build
+
+      - name: Verify artifact
+        run: npm run verify:dist
+
+      - name: Upload static artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-app-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
+  container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: validate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build --tag 0xda-market-web-app:ci .
+
+      - name: Smoke test container
+        run: |
+          docker run --detach --rm --name web-app-ci --publish 18080:8080 0xda-market-web-app:ci
+          trap 'docker stop web-app-ci >/dev/null 2>&1 || true' EXIT
+          for attempt in $(seq 1 20); do
+            if curl --fail --silent http://127.0.0.1:18080/healthz >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:18080/healthz
+          curl --fail --silent http://127.0.0.1:18080/ | grep -F '<title>0xda-market</title>'

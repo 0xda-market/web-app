@@ -2,14 +2,14 @@
 
 Host-agnostic marketplace UI, catalog state and interaction package.
 
-`webapp-core` owns reusable catalog, pagination, checkout, broker, admin and shared presentation flows. It does not own authentication, messenger SDKs, signed session payloads, backend APIs or channel deployment entry points.
+`webapp-core` owns reusable catalog, pagination, checkout, broker listing and shared presentation flows. It does not own authentication, messenger SDKs, signed session payloads, backend APIs or channel deployment entry points.
 
 ## Integration
 
 A host imports `mountMarketApp` and supplies:
 
 - `host`: locale, viewport, viewport events and feedback;
-- `transport`: bootstrap, quote, acceptance and order refresh operations;
+- `transport`: bootstrap, checkout and broker-listing operations;
 - `document`: the host browser document.
 
 The catalog and checkout engine is bundled and exported by this repository. A host may still pass a compatible `engine` explicitly for testing or staged migration.
@@ -19,7 +19,7 @@ const app = await mountMarketApp({ host, transport, document });
 const { catalog, session, currencies } = app.context();
 ```
 
-`transport.bootstrap()` returns the complete `{ data, meta }` JSON document. Resource operations return their `data` resource. Broker hosts pass the explicit context to `mountBrokerWorkspace`; local drafts are isolated by the verified opaque session subject and deployment environment.
+`transport.bootstrap()` returns the complete `{ data, meta }` JSON document. Resource operations return their `data` resource. Broker hosts pass the explicit context and transport to `mountBrokerWorkspace`; listings are durable core resources, not browser-local drafts. Users with role `admin` mount the same broker workspace.
 
 Production adapters belong to their channel repositories:
 

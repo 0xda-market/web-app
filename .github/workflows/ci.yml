@@ -5,6 +5,11 @@ on:
   push:
     branches:
       - main
+      - "feature/**"
+      - "fix/**"
+      - "refactor/**"
+      - "docs/**"
+      - "chore/**"
 
 permissions:
   contents: read

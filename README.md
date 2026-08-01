@@ -59,13 +59,43 @@ The checkout flow requires a real Telegram Mini App session because every server
 
 A host supplies verified session context, capabilities, locale, theme, viewport behavior, navigation primitives and authenticated API transport. Locale is presentation input, never authorization. Broker quote currency remains an explicit user choice.
 
-## Local validation
+## Development and validation
+
+The browser workspace has no runtime npm dependencies. Node.js is used only for deterministic validation and artifact assembly.
 
 ```sh
-npm test
+npm ci
 npm run check
-python3 -m http.server 8080
+npm test
+npm run build
+npm run verify:dist
 ```
+
+Serve the generated artifact locally:
+
+```sh
+python3 -m http.server 8080 --directory dist
+```
+
+Build and smoke-test the production-like container:
+
+```sh
+docker build -t 0xda-market-web-app .
+docker run --rm -p 8080:8080 0xda-market-web-app
+curl --fail http://127.0.0.1:8080/healthz
+```
+
+GitHub Actions runs source checks, tests, artifact verification, container build and HTTP smoke tests for every pull request. The workflow uploads `dist/` as a short-lived artifact for inspection.
+
+## Deployment boundary
+
+The container exposes port `8080` and provides:
+
+- `GET /healthz` — static runtime health probe;
+- `GET /` — Web App shell;
+- SPA fallback to `index.html` for browser-owned routes.
+
+This repository does not register Telegram menu buttons, mutate bot settings or deploy itself to production. Those actions require a separate reviewed infrastructure change after the development runtime is verified.
 
 ## Rollout
 

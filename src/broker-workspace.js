@@ -1,25 +1,24 @@
-const STORAGE_KEY = "0xda-market.broker-offers.v1";
-const CURRENCIES = ["USDT", "USD", "EUR", "UAH", "TON", "BTC", "ETH"];
+const STORAGE_PREFIX = "0xda-market.broker-offers.v2";
 
-function sessionRole(snapshot) {
-  return snapshot?.metadata?.role || snapshot?.meta?.role || snapshot?.user?.role || snapshot?.session?.role || null;
+export function brokerStorageKey(session) {
+  const subject = String(session?.subject || "").trim();
+  const environment = String(session?.environment || "").trim();
+  if (!subject) throw new TypeError("broker session subject is required");
+  if (!environment) throw new TypeError("broker session environment is required");
+  return `${STORAGE_PREFIX}:${encodeURIComponent(environment)}:${encodeURIComponent(subject)}`;
 }
 
-function productsFrom(snapshot) {
-  return Array.isArray(snapshot?.products) ? snapshot.products : [];
-}
-
-function readOffers(storage) {
+function readOffers(storage, key) {
   try {
-    const parsed = JSON.parse(storage.getItem(STORAGE_KEY) || "[]");
+    const parsed = JSON.parse(storage.getItem(key) || "[]");
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function writeOffers(storage, offers) {
-  storage.setItem(STORAGE_KEY, JSON.stringify(offers));
+function writeOffers(storage, key, offers) {
+  storage.setItem(key, JSON.stringify(offers));
 }
 
 function element(document, tag, attributes = {}, text = null) {
@@ -33,11 +32,21 @@ function element(document, tag, attributes = {}, text = null) {
   return node;
 }
 
-export function mountBrokerWorkspace({ document, snapshot, storage = globalThis.localStorage }) {
-  const role = sessionRole(snapshot);
-  if (!["broker", "admin"].includes(role)) return null;
+export function mountBrokerWorkspace({
+  document,
+  catalog,
+  session,
+  currencies,
+  storage = globalThis.localStorage
+}) {
+  if (!["broker", "admin"].includes(session?.role)) return null;
+  if (!document?.createElement) throw new TypeError("document is required");
+  if (!Array.isArray(catalog?.products)) throw new TypeError("broker catalog is required");
+  if (!Array.isArray(currencies) || currencies.length === 0) throw new TypeError("broker currencies are required");
+  if (!storage?.getItem || !storage?.setItem) throw new TypeError("broker storage is required");
 
-  const products = productsFrom(snapshot);
+  const storageKey = brokerStorageKey(session);
+  const products = catalog.products;
   const root = element(document, "section", { id: "broker-workspace", className: "broker-workspace" });
   const title = element(document, "h2", {}, "Broker workspace");
   const description = element(document, "p", {}, "Create and update local offer drafts. Product, quantity, amount and quote currency remain editable.");
@@ -50,7 +59,7 @@ export function mountBrokerWorkspace({ document, snapshot, storage = globalThis.
   const status = element(document, "p", { id: "broker-offer-status", role: "status" });
   const list = element(document, "div", { id: "broker-offer-list" });
   let editingId = null;
-  let offers = readOffers(storage);
+  let offers = readOffers(storage, storageKey);
 
   for (const entry of products) {
     const option = element(document, "option");
@@ -58,7 +67,7 @@ export function mountBrokerWorkspace({ document, snapshot, storage = globalThis.
     option.textContent = entry?.attributes?.name || entry?.attributes?.button_label || entry.id;
     product.append(option);
   }
-  for (const code of CURRENCIES) {
+  for (const code of currencies) {
     const option = element(document, "option", { value: code }, code);
     currency.append(option);
   }
@@ -95,7 +104,7 @@ export function mountBrokerWorkspace({ document, snapshot, storage = globalThis.
       const remove = element(document, "button", { type: "button" }, "Delete");
       remove.addEventListener("click", () => {
         offers = offers.filter((entry) => entry.id !== offer.id);
-        writeOffers(storage, offers);
+        writeOffers(storage, storageKey, offers);
         render();
         status.textContent = "Offer draft deleted.";
       });
@@ -128,12 +137,12 @@ export function mountBrokerWorkspace({ document, snapshot, storage = globalThis.
     const index = offers.findIndex((entry) => entry.id === offer.id);
     if (index >= 0) offers[index] = offer;
     else offers.unshift(offer);
-    writeOffers(storage, offers);
+    writeOffers(storage, storageKey, offers);
     editingId = null;
     save.textContent = "Save offer";
     form.reset();
     quantity.value = "1";
-    currency.value = "USDT";
+    currency.value = currencies[0];
     status.textContent = "Offer draft saved locally.";
     render();
   });
@@ -141,5 +150,5 @@ export function mountBrokerWorkspace({ document, snapshot, storage = globalThis.
   root.append(title, description, form, status, list);
   (document.querySelector("main") || document.body).append(root);
   render();
-  return { root, getOffers: () => [...offers] };
+  return { root, storageKey, getOffers: () => [...offers] };
 }

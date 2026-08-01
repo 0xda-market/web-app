@@ -1,15 +1,16 @@
 {
-  "name": "@0xda-market/web-app",
-  "version": "0.1.0",
+  "name": "@0xda-market/webapp-core",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.js",
     "./contracts": "./src/contracts.js",
+    "./engine": "./src/engine.js",
     "./broker-workspace": "./src/broker-workspace.js"
   },
   "scripts": {
-    "check": "node --check src/index.js && node --check src/contracts.js && node --check src/broker-workspace.js",
+    "check": "node --check src/index.js && node --check src/contracts.js && node --check src/engine.js && node --check src/broker-workspace.js",
     "test": "node --test"
   },
   "engines": {

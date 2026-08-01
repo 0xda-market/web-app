@@ -1,20 +1,58 @@
 import { assertHost, assertTransport } from "./contracts.js";
+import * as bundledEngine from "./engine.js";
 
-export function createMarketApp({ host, transport, engine, document }) {
+function immutable(value) {
+  if (Array.isArray(value)) value.forEach(immutable);
+  else if (value && typeof value === "object") Object.values(value).forEach(immutable);
+  return value && typeof value === "object" ? Object.freeze(value) : value;
+}
+
+function currencyCode(resource) {
+  return String(resource?.attributes?.code || resource?.attributes?.short_name || resource?.id || "").trim().toUpperCase();
+}
+
+export function createBootstrapContext(document, engine = bundledEngine) {
+  const catalog = engine.createCatalogSnapshot(document);
+  const metadata = document.meta || {};
+  const rawSession = metadata.session || metadata.user || {};
+  const currencies = Array.isArray(metadata.currencies)
+    ? metadata.currencies.map(currencyCode).filter(Boolean)
+    : [];
+
+  return immutable({
+    catalog,
+    session: {
+      role: rawSession.role || null,
+      status: rawSession.status || null,
+      subject: rawSession.subject || null,
+      environment: rawSession.environment || metadata.environment || null
+    },
+    currencies: [...new Set(currencies)]
+  });
+}
+
+export function createMarketApp({ host, transport, engine = bundledEngine, document }) {
   assertHost(host);
   assertTransport(transport);
-  if (!engine?.CatalogStore || !engine?.CheckoutController) throw new TypeError("engine must provide CatalogStore and CheckoutController");
-  if (!document?.querySelector) throw new TypeError("document is required");
+  if (!engine?.CatalogStore || !engine?.CheckoutController || !engine?.createCatalogSnapshot) {
+    throw new TypeError("engine must provide catalog and checkout primitives");
+  }
+  if (!document?.querySelector || !document?.createElement) throw new TypeError("document is required");
 
   let store;
   let selectedProduct;
+  let bootstrapContext;
   let bootstrapped = false;
-  const $ = (selector) => document.querySelector(selector);
+  const required = (selector) => {
+    const node = document.querySelector(selector);
+    if (!node) throw new TypeError(`required WebApp element is missing: ${selector}`);
+    return node;
+  };
   const elements = {
-    action: $("#checkout-action"), category: $("#category"), closeDialog: $("#close-dialog"),
-    dialog: $("#checkout-dialog"), dialogCategory: $("#dialog-category"), dialogName: $("#dialog-name"),
-    dialogPrice: $("#dialog-price"), dialogStatus: $("#dialog-status"), home: $("#home"), next: $("#next"),
-    previous: $("#previous"), products: $("#products"), search: $("#search"), snapshot: $("#snapshot"), status: $("#status")
+    action: required("#checkout-action"), category: required("#category"), closeDialog: required("#close-dialog"),
+    dialog: required("#checkout-dialog"), dialogCategory: required("#dialog-category"), dialogName: required("#dialog-name"),
+    dialogPrice: required("#dialog-price"), dialogStatus: required("#dialog-status"), home: required("#home"), next: required("#next"),
+    previous: required("#previous"), products: required("#products"), search: required("#search"), snapshot: required("#snapshot"), status: required("#status")
   };
 
   const checkout = new engine.CheckoutController({
@@ -22,7 +60,6 @@ export function createMarketApp({ host, transport, engine, document }) {
     accept: (quoteId) => transport.acceptQuote({ quoteId }),
     refresh: (orderId) => transport.refreshOrder({ orderId })
   });
-
   const pageSize = () => engine.pageSizeForViewport(host.viewport());
 
   function productCard(product) {
@@ -112,15 +149,28 @@ export function createMarketApp({ host, transport, engine, document }) {
   async function start() {
     if (bootstrapped) throw new Error("Market app already started");
     bootstrapped = true;
-    const snapshot = engine.createCatalogSnapshot(await transport.bootstrap({ locale: host.locale() }));
-    store = new engine.CatalogStore(snapshot, { pageSize: pageSize() });
-    elements.snapshot.textContent = `${snapshot.id.slice(0, 8)} · ${snapshot.count}`;
-    for (const category of snapshot.categories) elements.category.add(new Option(category.label, category.id));
+    const bootstrapDocument = await transport.bootstrap({ locale: host.locale() });
+    bootstrapContext = createBootstrapContext(bootstrapDocument, engine);
+    store = new engine.CatalogStore(bootstrapContext.catalog, { pageSize: pageSize() });
+    elements.snapshot.textContent = `${bootstrapContext.catalog.id.slice(0, 8)} · ${bootstrapContext.catalog.count}`;
+    for (const category of bootstrapContext.catalog.categories) {
+      const option = document.createElement("option");
+      option.value = category.id;
+      option.textContent = category.label;
+      elements.category.append(option);
+    }
     bind();
     renderCatalog();
+    return bootstrapContext;
   }
 
-  return { start };
+  return {
+    start,
+    context() {
+      if (!bootstrapContext) throw new Error("Market app has not started");
+      return bootstrapContext;
+    }
+  };
 }
 
 export async function mountMarketApp(options) {
@@ -128,3 +178,6 @@ export async function mountMarketApp(options) {
   await app.start();
   return app;
 }
+
+export { mountBrokerWorkspace, brokerStorageKey } from "./broker-workspace.js";
+export * from "./engine.js";

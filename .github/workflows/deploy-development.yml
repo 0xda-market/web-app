@@ -1,0 +1,68 @@
+name: Deploy development
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-app-development
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: development
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${VPS_PORT:-22022}" "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload immutable release
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          destination="/opt/0xda-market-web-app/environments/development/releases/$RELEASE_SHA"
+          ssh -p "${VPS_PORT:-22022}" "$VPS_USER@$VPS_HOST" "mkdir -p '$destination'"
+          rsync -az --delete -e "ssh -p ${VPS_PORT:-22022}" \
+            --exclude .git \
+            --exclude node_modules \
+            ./ "$VPS_USER@$VPS_HOST:$destination/"
+
+      - name: Activate health-gated release
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          ssh -p "${VPS_PORT:-22022}" "$VPS_USER@$VPS_HOST" \
+            "chmod +x /opt/0xda-market-web-app/environments/development/releases/$RELEASE_SHA/deploy/vps/deploy.sh && RELEASE_SHA=$RELEASE_SHA WEB_APP_PORT=10002 /opt/0xda-market-web-app/environments/development/releases/$RELEASE_SHA/deploy/vps/deploy.sh"
+
+      - name: Verify public route
+        run: |
+          curl --fail --show-error --silent --retry 10 --retry-delay 3 \
+            https://0xda-market.nilx.one/app/healthz

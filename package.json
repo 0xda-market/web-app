@@ -5,10 +5,11 @@
   "type": "module",
   "exports": {
     ".": "./src/index.js",
-    "./contracts": "./src/contracts.js"
+    "./contracts": "./src/contracts.js",
+    "./broker-workspace": "./src/broker-workspace.js"
   },
   "scripts": {
-    "check": "node --check src/index.js && node --check src/contracts.js",
+    "check": "node --check src/index.js && node --check src/contracts.js && node --check src/broker-workspace.js",
     "test": "node --test"
   },
   "engines": {

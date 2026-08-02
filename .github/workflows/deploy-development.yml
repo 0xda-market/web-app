@@ -22,8 +22,8 @@ jobs:
     timeout-minutes: 30
     environment: development
     env:
-      SSH_HOST: ${{ vars.SSH_HOST }}
-      SSH_USER: ${{ vars.SSH_USER }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SSH_PORT: 22022
       SSH_DEPLOYMENT_PATH: ${{ vars.SSH_DEPLOYMENT_PATH }}

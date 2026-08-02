@@ -51,6 +51,16 @@ An administrator host may supply:
 
 `createAdminCatalogController` keeps locale-neutral product versions independent from localization versions. `mountAdminProducts` exposes short name, status, position, marketability, metadata and localized copy. It never edits SKU or price state. Stale writes remain server-defined concurrency errors and are surfaced to the user without browser-side retries.
 
+## Price proposals, application and history
+
+An administrator host may supply:
+
+- `getAdminPriceProposal({ locale })`;
+- `applyAdminPrices({ revision, prices })`;
+- `listAdminPriceHistory({ limit })`.
+
+`createAdminPricingController` preserves the proposal revision and submits it with one complete catalog-wide application. Every active product and currency requires a positive USDT amount before the user can confirm. `mountAdminPrices` uses a two-step review and confirmation flow, then reloads the authoritative proposal and append-only history. A concurrent application remains a server-defined `concurrency_conflict`; the browser does not retry or merge stale values.
+
 ## Pre-wallet delivery sequence
 
 The implementation order preserves existing core contracts:

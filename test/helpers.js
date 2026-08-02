@@ -7,7 +7,9 @@ export class FakeElement {
     this.dataset = {};
     this.textContent = "";
     this.value = "";
+    this.checked = false;
     this.disabled = false;
+    this.hidden = false;
   }
 
   append(...nodes) { this.children.push(...nodes); }
@@ -18,7 +20,7 @@ export class FakeElement {
   dispatch(type, event = {}) { return this.listeners.get(type)?.({ currentTarget: this, preventDefault() {}, ...event }); }
   showModal() { this.open = true; }
   close() { this.open = false; }
-  reset() { this.value = ""; for (const child of this.children) child.reset?.(); }
+  reset() { this.value = ""; this.checked = false; for (const child of this.children) child.reset?.(); }
 }
 
 export function marketDocument() {

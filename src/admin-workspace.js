@@ -1,3 +1,4 @@
+import { mountAdminPrices } from "./admin-prices.js";
 import { mountAdminProducts } from "./admin-products.js";
 
 function element(document, tag, attributes = {}, text = null) {
@@ -12,6 +13,11 @@ function element(document, tag, attributes = {}, text = null) {
 
 function supportsAdminProducts(transport) {
   return ["listAdminProducts", "updateAdminProduct", "saveAdminProductLocalization"]
+    .every((method) => typeof transport?.[method] === "function");
+}
+
+function supportsAdminPrices(transport) {
+  return ["getAdminPriceProposal", "applyAdminPrices", "listAdminPriceHistory"]
     .every((method) => typeof transport?.[method] === "function");
 }
 
@@ -49,9 +55,10 @@ export function mountAdminWorkspace({
   );
   const grid = element(document, "div", { className: "admin-capability-grid" });
   const productsWritable = supportsAdminProducts(transport);
+  const pricesWritable = supportsAdminPrices(transport);
   const capabilities = [
     ["Products", `${summary.products} catalog products`, productsWritable ? "Catalog and localized copy are editable below." : "Catalog editing requires an administrator transport."],
-    ["Prices", `${summary.pricedProducts} priced · ${summary.unpricedProducts} unpriced`, "Price history and proposal application remain server-owned."],
+    ["Prices", `${summary.pricedProducts} priced · ${summary.unpricedProducts} unpriced`, pricesWritable ? "Revisioned proposals and append-only history are available below." : "Price administration requires an administrator transport."],
     ["Users", "Roles and access", "User search and role changes will use internal user IDs."],
     ["Orders", "Quote and order lifecycle", "Order history and operations will preserve core lifecycle rules."],
     ["Listings", "Broker inventory", "Admin-wide listing visibility follows broker-owned listing contracts."],
@@ -73,5 +80,12 @@ export function mountAdminWorkspace({
   const products = productsWritable
     ? mountAdminProducts({ document, session, transport, locale, container: root })
     : null;
-  return { root, summary, products, ready: products?.ready || Promise.resolve(null) };
+  const prices = pricesWritable
+    ? mountAdminPrices({ document, session, transport, locale, container: root })
+    : null;
+  const ready = Promise.all([
+    products?.ready || Promise.resolve(null),
+    prices?.ready || Promise.resolve(null)
+  ]);
+  return { root, summary, products, prices, ready };
 }

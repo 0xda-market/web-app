@@ -37,6 +37,15 @@ This package contains no `Telegram.WebApp`, `initData`, Telegram endpoint, OAuth
 
 Hosts must consume an immutable commit or released package version. Mutable default-branch module URLs are not a supported production contract.
 
+## Development deployment
+
+The `development` GitHub environment requires:
+
+- variables: `SSH_HOST`, `SSH_USER` and `SSH_DEPLOYMENT_PATH`;
+- secret: `SSH_PRIVATE_KEY`.
+
+`SSH_DEPLOYMENT_PATH` is the same shared base path used by `core`. WebApp releases remain isolated under `<SSH_DEPLOYMENT_PATH>/webapp-core/environments/development`. The SSH port is fixed to `22022` by the workflow.
+
 ## Validation
 
 ```sh

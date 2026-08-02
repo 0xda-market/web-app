@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 concurrency:
   group: web-app-development
@@ -64,3 +65,26 @@ jobs:
           ln -sfn "$release" "$root/current"
           find "$root/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | tail -n +4 | cut -d' ' -f2- | xargs -r rm -rf
           REMOTE
+      - name: Publish VPS deployment status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOY_STATE: ${{ job.status == 'success' && 'success' || 'failure' }}
+        run: |
+          description="webapp-core VPS deployment failed"
+          if [ "$DEPLOY_STATE" = success ]; then
+            description="webapp-core VPS deployment is healthy"
+          fi
+          payload="$(jq -nc \
+            --arg state "$DEPLOY_STATE" \
+            --arg context "deploy/vps-webapp-development" \
+            --arg description "$description" \
+            --arg target_url "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            '{state:$state,context:$context,description:$description,target_url:$target_url}')"
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer $GH_TOKEN" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/statuses/${RELEASE_SHA}" \
+            --data "$payload"

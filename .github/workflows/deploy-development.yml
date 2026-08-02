@@ -22,28 +22,38 @@ jobs:
     timeout-minutes: 30
     environment: development
     env:
-      VPS_HOST: ${{ secrets.VPS_HOST }}
-      VPS_USER: ${{ secrets.VPS_USER }}
-      VPS_SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
-      VPS_PORT: 22022
+      SSH_HOST: ${{ vars.SSH_HOST }}
+      SSH_USER: ${{ vars.SSH_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_PORT: 22022
       DEPLOY_PATH: ${{ vars.VPS_WEB_APP_DEPLOY_PATH || '/opt/0xda-market-web-app' }}
       RELEASE_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.RELEASE_SHA }}
+      - name: Validate SSH configuration
+        run: |
+          missing=0
+          for name in SSH_HOST SSH_USER SSH_PRIVATE_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::${name} is not configured for the development environment"
+              missing=1
+            fi
+          done
+          exit "$missing"
       - name: Configure SSH
         run: |
           install -m 0700 -d "$HOME/.ssh"
-          printf '%s\n' "$VPS_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
           chmod 0600 "$HOME/.ssh/id_ed25519"
-          ssh-keyscan -p "$VPS_PORT" -H "$VPS_HOST" >> "$HOME/.ssh/known_hosts"
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> "$HOME/.ssh/known_hosts"
       - name: Upload and activate development release
         run: |
           archive="/tmp/web-app-${RELEASE_SHA}.tar.gz"
           tar --exclude=.git -czf "$archive" .
-          scp -P "$VPS_PORT" "$archive" "$VPS_USER@$VPS_HOST:/tmp/"
-          ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          scp -P "$SSH_PORT" "$archive" "$SSH_USER@$SSH_HOST:/tmp/"
+          ssh -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
           set -eu
           root="$DEPLOY_PATH/environments/development"
           release="$root/releases/$RELEASE_SHA"

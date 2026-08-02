@@ -181,5 +181,6 @@ export async function mountMarketApp(options) {
 
 export { mountBrokerWorkspace, brokerStorageKey } from "./broker-workspace.js";
 export { mountAdminWorkspace, adminWorkspaceSummary } from "./admin-workspace.js";
+export { createAdminCatalogController, mountAdminProducts } from "./admin-products.js";
 export { mountWorkspaceNavigation, workspaceSectionsForRole } from "./workspace-navigation.js";
 export * from "./engine.js";

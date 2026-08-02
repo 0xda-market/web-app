@@ -1,3 +1,5 @@
+import { mountAdminProducts } from "./admin-products.js";
+
 function element(document, tag, attributes = {}, text = null) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attributes)) {
@@ -6,6 +8,11 @@ function element(document, tag, attributes = {}, text = null) {
   }
   if (text !== null) node.textContent = text;
   return node;
+}
+
+function supportsAdminProducts(transport) {
+  return ["listAdminProducts", "updateAdminProduct", "saveAdminProductLocalization"]
+    .every((method) => typeof transport?.[method] === "function");
 }
 
 export function adminWorkspaceSummary(catalog) {
@@ -18,7 +25,14 @@ export function adminWorkspaceSummary(catalog) {
   });
 }
 
-export function mountAdminWorkspace({ document, catalog, session, container = document?.body }) {
+export function mountAdminWorkspace({
+  document,
+  catalog,
+  session,
+  transport = null,
+  locale = "en_US",
+  container = document?.body
+}) {
   if (session?.role !== "admin") return null;
   if (!document?.createElement) throw new TypeError("document is required");
   if (!Array.isArray(catalog?.products)) throw new TypeError("admin catalog is required");
@@ -31,11 +45,12 @@ export function mountAdminWorkspace({ document, catalog, session, container = do
     document,
     "p",
     { className: "admin-workspace-description" },
-    "Pre-wallet operations are introduced as isolated capabilities. This overview is read-only until each capability receives its own reviewed API contract."
+    "Pre-wallet operations are introduced as isolated capabilities with independent server contracts."
   );
   const grid = element(document, "div", { className: "admin-capability-grid" });
+  const productsWritable = supportsAdminProducts(transport);
   const capabilities = [
-    ["Products", `${summary.products} catalog products`, "Catalog editing is the next writable slice."],
+    ["Products", `${summary.products} catalog products`, productsWritable ? "Catalog and localized copy are editable below." : "Catalog editing requires an administrator transport."],
     ["Prices", `${summary.pricedProducts} priced · ${summary.unpricedProducts} unpriced`, "Price history and proposal application remain server-owned."],
     ["Users", "Roles and access", "User search and role changes will use internal user IDs."],
     ["Orders", "Quote and order lifecycle", "Order history and operations will preserve core lifecycle rules."],
@@ -55,5 +70,8 @@ export function mountAdminWorkspace({ document, catalog, session, container = do
 
   root.append(title, description, grid);
   container.append(root);
-  return { root, summary };
+  const products = productsWritable
+    ? mountAdminProducts({ document, session, transport, locale, container: root })
+    : null;
+  return { root, summary, products, ready: products?.ready || Promise.resolve(null) };
 }

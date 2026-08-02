@@ -9,7 +9,7 @@ Host-agnostic marketplace UI, catalog state and interaction package.
 A host imports `mountMarketApp` and supplies:
 
 - `host`: locale, viewport, viewport events and feedback;
-- `transport`: bootstrap, checkout and broker-listing operations;
+- `transport`: bootstrap, checkout and role-specific resource operations;
 - `document`: the host browser document.
 
 The catalog and checkout engine is bundled and exported by this repository. A host may still pass a compatible `engine` explicitly for testing or staged migration.
@@ -39,11 +39,21 @@ Workspace visibility derives only from the verified session supplied by the host
 | `broker` | Market, Listings |
 | `admin` | Market, Listings, Administration |
 
-`mountWorkspaceNavigation` controls section visibility without interpreting channel authentication. `mountAdminWorkspace` currently provides a read-only operational overview. Writable administration is intentionally delivered as separate reviewed capabilities rather than one privileged catch-all endpoint.
+`mountWorkspaceNavigation` controls section visibility without interpreting channel authentication. `mountAdminWorkspace` composes isolated administrator capabilities rather than creating one privileged catch-all surface.
+
+## Products and localizations
+
+An administrator host may supply:
+
+- `listAdminProducts({ locale })`;
+- `updateAdminProduct({ sku, version, attributes })`;
+- `saveAdminProductLocalization({ sku, locale, fullName, buttonLabel, version? })`.
+
+`createAdminCatalogController` keeps locale-neutral product versions independent from localization versions. `mountAdminProducts` exposes short name, status, position, marketability, metadata and localized copy. It never edits SKU or price state. Stale writes remain server-defined concurrency errors and are surfaced to the user without browser-side retries.
 
 ## Pre-wallet delivery sequence
 
-The planned implementation order preserves existing core contracts:
+The implementation order preserves existing core contracts:
 
 1. role workspace navigation and admin overview;
 2. products and localizations;

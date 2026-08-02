@@ -41,7 +41,8 @@ Hosts must consume an immutable commit or released package version. Mutable defa
 
 The `development` GitHub environment requires:
 
-- secrets: `SSH_HOST`, `SSH_USER`, `SSH_PRIVATE_KEY` and `SSH_DEPLOYMENT_PATH`.
+- secrets: `SSH_HOST`, `SSH_USER` and `SSH_PRIVATE_KEY`;
+- variable: `SSH_DEPLOYMENT_PATH`.
 
 `SSH_DEPLOYMENT_PATH` is the same shared base path used by `core`. WebApp releases remain isolated under `<SSH_DEPLOYMENT_PATH>/webapp-core/environments/development`. The SSH port is fixed to `22022` by the workflow.
 

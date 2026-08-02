@@ -19,7 +19,7 @@ const app = await mountMarketApp({ host, transport, document });
 const { catalog, session, currencies } = app.context();
 ```
 
-`transport.bootstrap()` returns the complete `{ data, meta }` JSON document. Resource operations return their `data` resource. Broker hosts pass the explicit context and transport to `mountBrokerWorkspace`; listings are durable core resources, not browser-local drafts. Users with role `admin` mount the same broker workspace.
+`transport.bootstrap()` returns the complete `{ data, meta }` document. Resource operations return their `data` resource. Broker hosts pass the explicit context and transport to `mountBrokerWorkspace`; listings are durable core resources, not browser-local drafts. Users with role `admin` mount the same broker workspace.
 
 Production adapters belong to their channel repositories:
 
@@ -82,6 +82,8 @@ The `development` GitHub environment requires:
 - variable: `SSH_DEPLOYMENT_PATH`.
 
 `SSH_DEPLOYMENT_PATH` is the same shared base path used by `core`. WebApp releases remain isolated under `<SSH_DEPLOYMENT_PATH>/webapp-core/environments/development`. The SSH port is fixed to `22022` by the workflow.
+
+A successful health-gated deployment publishes the `deploy/vps-webapp-development` commit status on the exact release SHA. A failed deployment publishes the same context as `failure`.
 
 ## Validation
 

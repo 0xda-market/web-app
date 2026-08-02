@@ -29,6 +29,33 @@ Production adapters belong to their channel repositories:
 
 This package contains no `Telegram.WebApp`, `initData`, Telegram endpoint, OAuth or browser-session implementation.
 
+## Role workspaces
+
+Workspace visibility derives only from the verified session supplied by the host:
+
+| Role | Sections |
+| --- | --- |
+| `client` | Market |
+| `broker` | Market, Listings |
+| `admin` | Market, Listings, Administration |
+
+`mountWorkspaceNavigation` controls section visibility without interpreting channel authentication. `mountAdminWorkspace` currently provides a read-only operational overview. Writable administration is intentionally delivered as separate reviewed capabilities rather than one privileged catch-all endpoint.
+
+## Pre-wallet delivery sequence
+
+The planned implementation order preserves existing core contracts:
+
+1. role workspace navigation and admin overview;
+2. products and localizations;
+3. price proposals, application and history;
+4. users, identity lookup and role administration;
+5. customer and administrator order history;
+6. administrator visibility over broker listings;
+7. manual fulfillment task operations;
+8. wallet and automated settlement as a separate architecture phase.
+
+Each capability must introduce or reuse an explicit provider-neutral core API, a host transport operation and focused UI tests. Wallet-specific state must not leak into the preceding workspaces.
+
 ## Repository boundaries
 
 - [`core`](https://github.com/0xda-market/core) owns products, users, roles, currencies, quotes, orders, pricing and settlement contracts.

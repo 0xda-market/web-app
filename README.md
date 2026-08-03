@@ -16,7 +16,7 @@ The catalog and checkout engine is bundled and exported by this repository. A ho
 
 ```js
 const app = await mountMarketApp({ host, transport, document });
-const { catalog, session, currencies } = app.context();
+const { catalog, locale, session, currencies } = app.context();
 ```
 
 `transport.bootstrap()` returns the complete `{ data, meta }` document. Resource operations return their `data` resource. Broker hosts pass the explicit context and transport to `mountBrokerWorkspace`; listings are durable core resources, not browser-local drafts. Users with role `admin` mount the same broker workspace.
@@ -28,6 +28,21 @@ Production adapters belong to their channel repositories:
 - future messengers: their integration repositories.
 
 This package contains no `Telegram.WebApp`, `initData`, Telegram endpoint, OAuth or browser-session implementation.
+
+## Localization
+
+The shared WebApp owns all reusable interface copy. It currently ships complete `en_US` and `uk_UA` bundles for:
+
+- market loading, search, categories, pagination and checkout;
+- broker listings;
+- role navigation;
+- administration overview;
+- product and localization editing;
+- revisioned price administration.
+
+`host.locale()` is normalized before bootstrap. Ukrainian Telegram language codes such as `uk` and `uk-UA` resolve to `uk_UA`; unsupported locales fall back to `en_US`. Product names continue to come from core product localizations. Stable category identifiers such as `telegram_premium`, `telegram_stars` and `crypto_asset` remain unchanged in transport and storage while `createI18n(...).category(...)` renders human-readable labels.
+
+A host must pass the resolved locale into role-specific workspace mounts. Channel-specific static shell text should be neutral or updated before bootstrap so users do not see an English loading flash.
 
 ## Role workspaces
 

@@ -63,11 +63,13 @@ export function createAdminCatalogController({ transport, locale = "en_US" }) {
   }
 
   return {
-    async load() {
+    async load({ selectedProductId = null } = {}) {
       const resources = await transport.listAdminProducts({ locale });
       if (!Array.isArray(resources)) throw new TypeError("admin products response must be an array");
       products = resources.map(normalizeProduct);
-      selectedId = products[0]?.id || null;
+      selectedId = products.some((product) => product.id === selectedProductId)
+        ? selectedProductId
+        : products[0]?.id || null;
       return this.state();
     },
     select(productId) {
@@ -186,6 +188,14 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
     renderSelected();
   }
 
+  async function reload(selectedProductId = null) {
+    status.textContent = i18n.t("products.loading");
+    await controller.load({ selectedProductId });
+    renderProducts();
+    status.textContent = i18n.t("products.count", { count: controller.state().products.length });
+    return controller.state();
+  }
+
   productSelect.addEventListener("change", (event) => {
     controller.select(event.currentTarget.value);
     renderSelected();
@@ -250,14 +260,10 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
   root.append(heading, description, status, productSelect, productForm, localizationList, localizationForm);
   container.append(root);
 
-  const ready = controller.load().then(() => {
-    renderProducts();
-    status.textContent = i18n.t("products.count", { count: controller.state().products.length });
-    return controller.state();
-  }).catch((error) => {
+  const ready = reload().catch((error) => {
     status.textContent = error.message;
     throw error;
   });
 
-  return { root, status, productSelect, productForm, localizationForm, controller, ready };
+  return { root, status, productSelect, productForm, localizationForm, controller, reload, ready };
 }

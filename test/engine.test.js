@@ -17,16 +17,41 @@ test("applies portrait and landscape page-size policy", () => {
   assert.equal(pageSizeForViewport({ width: 1024, height: 600 }), 18);
 });
 
-test("executes checkout only after explicit actions", async () => {
+test("executes quantity-aware checkout only after explicit actions", async () => {
   const calls = [];
   const controller = new CheckoutController({
-    async quote(id) { calls.push(["quote", id]); return { id: "quote-1", attributes: { expires_at: "2026-08-01T13:00:00Z" } }; },
+    async quote(id, quantity) {
+      calls.push(["quote", id, quantity]);
+      return {
+        id: "quote-1",
+        attributes: {
+          expires_at: "2026-08-01T13:00:00Z",
+          quantity,
+          total_price_usdt: "25",
+          currency: "USDT"
+        }
+      };
+    },
     async accept(id) { calls.push(["accept", id]); return { id: "order-1", attributes: { status: "pending" } }; },
     async refresh(id) { calls.push(["refresh", id]); return { id, attributes: { status: "succeeded" } }; }
   });
   const product = createCatalogSnapshot(bootstrapDocument({ count: 1 })).products[0];
-  await controller.quote(product);
+  await controller.quote(product, "2");
+  assert.equal(controller.state.quantity, "2");
   await controller.accept();
+  assert.equal(controller.state.quantity, "2");
   await controller.refresh();
-  assert.deepEqual(calls, [["quote", "product_1"], ["accept", "quote-1"], ["refresh", "order-1"]]);
+  assert.deepEqual(calls, [["quote", "product_1", "2"], ["accept", "quote-1"], ["refresh", "order-1"]]);
+});
+
+test("rejects invalid purchase quantities before transport", async () => {
+  const controller = new CheckoutController({
+    async quote() { throw new Error("must not call"); },
+    async accept() {},
+    async refresh() {}
+  });
+  const product = createCatalogSnapshot(bootstrapDocument({ count: 1 })).products[0];
+
+  await assert.rejects(() => controller.quote(product, "0"), /positive decimal/);
+  await assert.rejects(() => controller.quote(product, "0.0000000000001"), /12 fractional digits/);
 });

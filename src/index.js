@@ -1,5 +1,6 @@
 import { assertHost, assertTransport } from "./contracts.js";
 import * as bundledEngine from "./engine.js";
+import { createI18n, normalizeLocale } from "./i18n.js";
 
 function immutable(value) {
   if (Array.isArray(value)) value.forEach(immutable);
@@ -11,7 +12,7 @@ function currencyCode(resource) {
   return String(resource?.attributes?.code || resource?.attributes?.short_name || resource?.id || "").trim().toUpperCase();
 }
 
-export function createBootstrapContext(document, engine = bundledEngine) {
+export function createBootstrapContext(document, engine = bundledEngine, locale = document?.meta?.locale) {
   const catalog = engine.createCatalogSnapshot(document);
   const metadata = document.meta || {};
   const rawSession = metadata.session || metadata.user || {};
@@ -21,6 +22,7 @@ export function createBootstrapContext(document, engine = bundledEngine) {
 
   return immutable({
     catalog,
+    locale: normalizeLocale(locale || metadata.locale),
     session: {
       role: rawSession.role || null,
       status: rawSession.status || null,
@@ -39,6 +41,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
   }
   if (!document?.querySelector || !document?.createElement) throw new TypeError("document is required");
 
+  const i18n = createI18n(host.locale());
   let store;
   let selectedProduct;
   let bootstrapContext;
@@ -56,11 +59,29 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
   };
 
   const checkout = new engine.CheckoutController({
-    quote: (sku) => transport.quote({ sku, locale: host.locale() }),
+    quote: (sku) => transport.quote({ sku, locale: i18n.locale }),
     accept: (quoteId) => transport.acceptQuote({ quoteId }),
     refresh: (orderId) => transport.refreshOrder({ orderId })
   });
   const pageSize = () => engine.pageSizeForViewport(host.viewport());
+
+  function localizeShell() {
+    document.documentElement?.setAttribute?.("lang", i18n.locale.replace("_", "-"));
+    const title = document.querySelector("#market-title");
+    if (title) title.textContent = i18n.t("market.title");
+    elements.snapshot.textContent = i18n.t("market.loading");
+    elements.search.placeholder = i18n.t("search.placeholder");
+    elements.search.setAttribute("aria-label", i18n.t("search.placeholder"));
+    elements.category.setAttribute("aria-label", i18n.t("category.label"));
+    elements.products.setAttribute("aria-label", i18n.t("catalog.productsLabel"));
+    elements.status.textContent = i18n.t("catalog.loading");
+    elements.previous.setAttribute("aria-label", i18n.t("navigation.previous"));
+    elements.next.setAttribute("aria-label", i18n.t("navigation.next"));
+    elements.home.textContent = i18n.t("navigation.categories");
+    elements.closeDialog.setAttribute("aria-label", i18n.t("checkout.close"));
+    elements.action.textContent = i18n.t("checkout.requestQuote");
+    document.querySelector(".navigation")?.setAttribute?.("aria-label", i18n.t("navigation.pages"));
+  }
 
   function productCard(product) {
     const button = document.createElement("button");
@@ -69,12 +90,12 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     button.disabled = !product.attributes.price;
     const category = document.createElement("span");
     category.className = "product-category";
-    category.textContent = product.category.label;
+    category.textContent = i18n.category(product.category.id, product.category.label);
     const name = document.createElement("strong");
     name.textContent = product.attributes.button_label || product.attributes.name;
     const price = document.createElement("span");
     price.className = "product-price";
-    price.textContent = engine.formatPrice(product) || "Unavailable";
+    price.textContent = engine.formatPrice(product) || i18n.t("catalog.unavailable");
     button.append(category, name, price);
     button.addEventListener("click", () => openCheckout(product));
     return button;
@@ -85,23 +106,29 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     elements.products.replaceChildren(...view.products.map(productCard));
     elements.previous.disabled = !view.hasPrevious;
     elements.next.disabled = !view.hasNext;
-    elements.status.textContent = `${view.totalProducts} products · ${view.page}/${view.pageCount}`;
+    elements.status.textContent = i18n.t("catalog.summary", {
+      count: view.totalProducts,
+      page: view.page,
+      pageCount: view.pageCount
+    });
   }
 
   function renderCheckout() {
     const state = checkout.state;
     const rows = {
-      idle: ["The current price will be validated before purchase.", "Request quote", false],
-      quoting: ["Requesting current quote…", "Request quote", true],
-      accepting: ["Creating order…", "Confirm purchase", true],
-      refreshing: ["Refreshing order…", "Refresh order", true],
-      pending: ["Order is being processed.", "Refresh order", false],
-      accepted: ["Order is being processed.", "Refresh order", false],
-      succeeded: ["Purchase completed ✅", "Request new quote", false],
-      failed: [state.error || "The operation failed.", "Try again", false]
+      idle: [i18n.t("checkout.validate"), i18n.t("checkout.requestQuote"), false],
+      quoting: [i18n.t("checkout.requesting"), i18n.t("checkout.requestQuote"), true],
+      accepting: [i18n.t("checkout.creating"), i18n.t("checkout.confirm"), true],
+      refreshing: [i18n.t("checkout.refreshing"), i18n.t("checkout.refresh"), true],
+      pending: [i18n.t("checkout.processing"), i18n.t("checkout.refresh"), false],
+      accepted: [i18n.t("checkout.processing"), i18n.t("checkout.refresh"), false],
+      succeeded: [i18n.t("checkout.completed"), i18n.t("checkout.requestNew"), false],
+      failed: [state.error || i18n.t("checkout.failed"), i18n.t("checkout.retry"), false]
     };
     const row = state.status === "quoted"
-      ? [`Quote expires ${new Date(state.quote.attributes.expires_at).toLocaleTimeString()}.`, "Confirm purchase", false]
+      ? [i18n.t("checkout.quoteExpires", {
+        time: new Date(state.quote.attributes.expires_at).toLocaleTimeString(i18n.locale.replace("_", "-"))
+      }), i18n.t("checkout.confirm"), false]
       : (rows[state.status] || rows.idle);
     [elements.dialogStatus.textContent, elements.action.textContent, elements.action.disabled] = row;
   }
@@ -109,9 +136,9 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
   function openCheckout(product) {
     selectedProduct = product;
     checkout.reset(product);
-    elements.dialogCategory.textContent = product.category.label;
+    elements.dialogCategory.textContent = i18n.category(product.category.id, product.category.label);
     elements.dialogName.textContent = product.attributes.name;
-    elements.dialogPrice.textContent = engine.formatPrice(product) || "Unavailable";
+    elements.dialogPrice.textContent = engine.formatPrice(product) || i18n.t("catalog.unavailable");
     renderCheckout();
     elements.dialog.showModal();
     host.selectionFeedback();
@@ -149,14 +176,19 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
   async function start() {
     if (bootstrapped) throw new Error("Market app already started");
     bootstrapped = true;
-    const bootstrapDocument = await transport.bootstrap({ locale: host.locale() });
-    bootstrapContext = createBootstrapContext(bootstrapDocument, engine);
+    localizeShell();
+    const bootstrapDocument = await transport.bootstrap({ locale: i18n.locale });
+    bootstrapContext = createBootstrapContext(bootstrapDocument, engine, i18n.locale);
     store = new engine.CatalogStore(bootstrapContext.catalog, { pageSize: pageSize() });
     elements.snapshot.textContent = `${bootstrapContext.catalog.id.slice(0, 8)} · ${bootstrapContext.catalog.count}`;
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = i18n.t("category.all");
+    elements.category.replaceChildren(all);
     for (const category of bootstrapContext.catalog.categories) {
       const option = document.createElement("option");
       option.value = category.id;
-      option.textContent = category.label;
+      option.textContent = i18n.category(category.id, category.label);
       elements.category.append(option);
     }
     bind();
@@ -179,6 +211,7 @@ export async function mountMarketApp(options) {
   return app;
 }
 
+export { createI18n, normalizeLocale } from "./i18n.js";
 export { mountBrokerWorkspace, brokerStorageKey } from "./broker-workspace.js";
 export { mountAdminWorkspace, adminWorkspaceSummary } from "./admin-workspace.js";
 export { createAdminCatalogController, mountAdminProducts } from "./admin-products.js";

@@ -1,3 +1,5 @@
+import { createI18n } from "./i18n.js";
+
 const LEGACY_STORAGE_PREFIX = "0xda-market.broker-offers.v2";
 
 // Retained for hosts pinned to the previous draft-storage contract. Durable
@@ -47,17 +49,18 @@ function normalizeListing(resource) {
   });
 }
 
-export async function mountBrokerWorkspace({ document, catalog, session, currencies, transport }) {
+export async function mountBrokerWorkspace({ document, catalog, session, currencies, transport, locale = "en_US" }) {
   if (!["broker", "admin"].includes(session?.role)) return null;
   if (!document?.createElement) throw new TypeError("document is required");
   if (!Array.isArray(catalog?.products)) throw new TypeError("broker catalog is required");
   if (!Array.isArray(currencies) || currencies.length === 0) throw new TypeError("broker currencies are required");
   assertListingTransport(transport);
 
+  const i18n = createI18n(locale);
   const products = catalog.products;
   const root = element(document, "section", { id: "broker-workspace", className: "broker-workspace" });
-  const title = element(document, "h2", {}, "Asset listings");
-  const description = element(document, "p", {}, "Set the available quantity and unit price for an asset.");
+  const title = element(document, "h2", {}, i18n.t("broker.title"));
+  const description = element(document, "p", {}, i18n.t("broker.description"));
   const form = element(document, "form", { id: "broker-listing-form" });
   const product = element(document, "select", { name: "product", required: "required" });
   const quantity = element(document, "input", {
@@ -67,8 +70,8 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
     name: "amount", type: "number", min: "0.00000001", step: "any", inputmode: "decimal", required: "required"
   });
   const currency = element(document, "select", { name: "currency", required: "required" });
-  const save = element(document, "button", { type: "submit" }, "Publish listing");
-  const status = element(document, "p", { id: "broker-listing-status", role: "status" }, "Loading listings…");
+  const save = element(document, "button", { type: "submit" }, i18n.t("broker.publish"));
+  const status = element(document, "p", { id: "broker-listing-status", role: "status" }, i18n.t("broker.loading"));
   const list = element(document, "div", { id: "broker-listing-list" });
   let editingId = null;
   let listings = [];
@@ -95,20 +98,20 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
   function resetForm() {
     editingId = null;
     product.disabled = false;
-    save.textContent = "Publish listing";
+    save.textContent = i18n.t("broker.publish");
     form.reset();
     quantity.value = "1";
     currency.value = currencies[0];
   }
 
   async function withdraw(listing) {
-    status.textContent = "Withdrawing listing…";
+    status.textContent = i18n.t("broker.withdrawing");
     try {
       await transport.withdrawBrokerListing({ listingId: listing.id, version: listing.version });
       listings = listings.filter((entry) => entry.id !== listing.id);
       if (editingId === listing.id) resetForm();
       render();
-      status.textContent = "Listing withdrawn.";
+      status.textContent = i18n.t("broker.withdrawn");
     } catch (error) {
       status.textContent = error.message;
     }
@@ -117,7 +120,7 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
   function render() {
     list.replaceChildren();
     if (!listings.length) {
-      list.append(element(document, "p", {}, "No active listings yet."));
+      list.append(element(document, "p", {}, i18n.t("broker.empty")));
       return;
     }
     for (const listing of listings) {
@@ -127,7 +130,7 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
         element(document, "strong", {}, productEntry?.attributes?.name || listing.sku),
         element(document, "span", {}, `${listing.quantity} × ${listing.priceAmount} ${listing.currency}`)
       );
-      const edit = element(document, "button", { type: "button" }, "Edit");
+      const edit = element(document, "button", { type: "button" }, i18n.t("broker.edit"));
       edit.addEventListener("click", () => {
         editingId = listing.id;
         product.value = listing.sku;
@@ -135,10 +138,10 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
         quantity.value = listing.quantity;
         amount.value = listing.priceAmount;
         currency.value = listing.currency;
-        save.textContent = "Update listing";
-        status.textContent = "Editing listing.";
+        save.textContent = i18n.t("broker.update");
+        status.textContent = i18n.t("broker.editing");
       });
-      const remove = element(document, "button", { type: "button" }, "Withdraw");
+      const remove = element(document, "button", { type: "button" }, i18n.t("broker.withdraw"));
       remove.addEventListener("click", () => withdraw(listing));
       card.append(edit, remove);
       list.append(card);
@@ -146,10 +149,10 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
   }
 
   form.append(
-    field("Asset", product),
-    field("Available quantity", quantity),
-    field("Unit price", amount),
-    field("Quote currency", currency),
+    field(i18n.t("broker.asset"), product),
+    field(i18n.t("broker.quantity"), quantity),
+    field(i18n.t("broker.unitPrice"), amount),
+    field(i18n.t("broker.currency"), currency),
     save
   );
   form.addEventListener("submit", async (event) => {
@@ -157,12 +160,12 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
     const normalizedQuantity = positiveDecimal(quantity.value, 12);
     const normalizedAmount = positiveDecimal(amount.value, 8);
     if (!product.value || !normalizedQuantity || !normalizedAmount || !currencies.includes(currency.value)) {
-      status.textContent = "Enter a valid asset, quantity, unit price and currency.";
+      status.textContent = i18n.t("broker.invalid");
       return;
     }
 
     save.disabled = true;
-    status.textContent = editingId ? "Updating listing…" : "Publishing listing…";
+    status.textContent = editingId ? i18n.t("broker.updating") : i18n.t("broker.publishing");
     try {
       let resource;
       if (editingId) {
@@ -189,7 +192,7 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
       product.disabled = false;
       resetForm();
       render();
-      status.textContent = index >= 0 ? "Listing updated." : "Listing published.";
+      status.textContent = index >= 0 ? i18n.t("broker.updated") : i18n.t("broker.published");
     } catch (error) {
       status.textContent = error.message;
     } finally {
@@ -204,7 +207,7 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
     if (!Array.isArray(resources)) throw new TypeError("broker listings response must be an array");
     listings = resources.map(normalizeListing);
     render();
-    status.textContent = `${listings.length} active listing${listings.length === 1 ? "" : "s"}.`;
+    status.textContent = i18n.t("broker.active", { count: listings.length });
   } catch (error) {
     render();
     status.textContent = error.message;

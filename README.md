@@ -29,15 +29,27 @@ Production adapters belong to their channel repositories:
 
 This package contains no `Telegram.WebApp`, `initData`, Telegram endpoint, OAuth or browser-session implementation.
 
+## Marketplace checkout
+
+The buyer selects a product and an explicit quantity. The shared checkout calls:
+
+- `quote({ sku, quantity, locale })`;
+- `acceptQuote({ quoteId })`;
+- `refreshOrder({ orderId })`.
+
+The backend quote is authoritative for product availability, final client price and inventory reservation. The shared UI preserves the requested quantity throughout quote, acceptance and refresh states, disables quantity changes after reservation, and renders the returned total and expiration. It does not select a broker or calculate supply economics.
+
+A product may remain in the complete catalog while unavailable. Hosts should preserve the backend `price: null` response so the card remains visible but cannot start checkout when no eligible broker liquidity exists.
+
 ## Localization
 
 The shared WebApp owns all reusable interface copy. It currently ships complete `en_US` and `uk_UA` bundles for:
 
-- market loading, search, categories, pagination and checkout;
-- broker listings;
+- market loading, search, categories, pagination and quantity-aware checkout;
+- broker listings and inventory balances;
 - role navigation;
 - administration overview;
-- product and localization editing;
+- product creation, editing and localization;
 - revisioned price administration.
 
 `host.locale()` is normalized before bootstrap. Ukrainian Telegram language codes such as `uk` and `uk-UA` resolve to `uk_UA`; unsupported locales fall back to `en_US`. Product names continue to come from core product localizations. Stable category identifiers such as `telegram_premium`, `telegram_stars` and `crypto_asset` remain unchanged in transport and storage while `createI18n(...).category(...)` renders human-readable labels.
@@ -60,11 +72,25 @@ Workspace visibility derives only from the verified session supplied by the host
 
 An administrator host may supply:
 
+- `createAdminProduct({ sku, attributes, localization })`;
 - `listAdminProducts({ locale })`;
 - `updateAdminProduct({ sku, version, attributes })`;
 - `saveAdminProductLocalization({ sku, locale, fullName, buttonLabel, version? })`.
 
+`mountAdminCreateProduct` creates one product and its initial localization. The shared controller always submits `status: "inactive"`; activation remains a separate reviewed edit after pricing and broker supply are ready. SKU creation is one-way in this surface and cannot silently mutate an existing product.
+
 `createAdminCatalogController` keeps locale-neutral product versions independent from localization versions. `mountAdminProducts` exposes short name, status, position, marketability, metadata and localized copy. It never edits SKU or price state. Stale writes remain server-defined concurrency errors and are surfaced to the user without browser-side retries.
+
+## Broker listings and inventory
+
+Broker listing transport remains:
+
+- `listBrokerListings()`;
+- `createBrokerListing({ sku, quantity, priceAmount, currency })`;
+- `updateBrokerListing({ listingId, quantity, priceAmount, currency, version })`;
+- `withdrawBrokerListing({ listingId, version })`.
+
+The workspace treats `quantity` as total committed inventory and renders the backend-owned `available_quantity`, `reserved_quantity` and `sold_quantity` balances. It does not derive or mutate those balances locally. Existing hosts that have not yet adopted the extended response remain readable with `available = quantity` and zero reserved/sold balances.
 
 ## Price proposals, application and history
 
@@ -78,22 +104,22 @@ An administrator host may supply:
 
 ## Pre-wallet delivery sequence
 
-The implementation order preserves existing core contracts:
+The implemented marketplace path is now:
 
-1. role workspace navigation and admin overview;
-2. products and localizations;
-3. price proposals, application and history;
-4. users, identity lookup and role administration;
-5. customer and administrator order history;
-6. administrator visibility over broker listings;
-7. manual fulfillment task operations;
-8. wallet and automated settlement as a separate architecture phase.
+1. administrator creates and localizes an inactive product;
+2. administrator reviews activation and applies client pricing;
+3. broker publishes finite supply and sees available, reserved and sold balances;
+4. client requests a quantity-aware quote backed by a backend reservation;
+5. client accepts the quote and receives an order;
+6. fulfillment and verification continue through the existing provider-neutral order lifecycle.
+
+Remaining operational capabilities are delivered separately: user administration, order history, admin-wide listing visibility, manual fulfillment operations, then wallet and automated settlement.
 
 Each capability must introduce or reuse an explicit provider-neutral core API, a host transport operation and focused UI tests. Wallet-specific state must not leak into the preceding workspaces.
 
 ## Repository boundaries
 
-- [`core`](https://github.com/0xda-market/core) owns products, users, roles, currencies, quotes, orders, pricing and settlement contracts.
+- [`core`](https://github.com/0xda-market/core) owns products, users, roles, currencies, listings, reservations, quotes, orders, pricing and settlement contracts.
 - `webapp-core` owns browser-native state and reusable interaction flows.
 - each host owns its SDK, authentication, transport, HTML/CSS shell and deployment.
 

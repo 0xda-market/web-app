@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { brokerStorageKey, mountBrokerWorkspace, mountMarketApp } from "../src/index.js";
 import { bootstrapDocument, marketDocument } from "./helpers.js";
 
-test("mounts a complete transport document with catalog, session and currencies", async () => {
+test("mounts a complete transport document with catalog, locale, session and currencies", async () => {
   const document = marketDocument();
   let bootstrapCalls = 0;
   const app = await mountMarketApp({
@@ -24,10 +24,11 @@ test("mounts a complete transport document with catalog, session and currencies"
 
   assert.equal(bootstrapCalls, 1);
   assert.equal(app.context().catalog.count, 2);
+  assert.equal(app.context().locale, "uk_UA");
   assert.equal(app.context().session.role, "broker");
   assert.deepEqual(app.context().currencies, ["USDT", "UAH"]);
   assert.equal(document.elements.products.children.length, 2);
-  assert.match(document.elements.status.textContent, /2 products/);
+  assert.equal(document.elements.status.textContent, "2 товари · 1/1");
 });
 
 test("retains the legacy draft key contract without using browser storage", () => {

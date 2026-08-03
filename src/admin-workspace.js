@@ -1,5 +1,6 @@
 import { mountAdminPrices } from "./admin-prices.js";
 import { mountAdminProducts } from "./admin-products.js";
+import { createI18n } from "./i18n.js";
 
 function element(document, tag, attributes = {}, text = null) {
   const node = document.createElement(tag);
@@ -44,25 +45,34 @@ export function mountAdminWorkspace({
   if (!Array.isArray(catalog?.products)) throw new TypeError("admin catalog is required");
   if (!container?.append) throw new TypeError("admin workspace container is required");
 
+  const i18n = createI18n(locale);
   const summary = adminWorkspaceSummary(catalog);
   const root = element(document, "section", { id: "admin-workspace", className: "admin-workspace" });
-  const title = element(document, "h2", {}, "Administration");
+  const title = element(document, "h2", {}, i18n.t("admin.title"));
   const description = element(
     document,
     "p",
     { className: "admin-workspace-description" },
-    "Pre-wallet operations are introduced as isolated capabilities with independent server contracts."
+    i18n.t("admin.description")
   );
   const grid = element(document, "div", { className: "admin-capability-grid" });
   const productsWritable = supportsAdminProducts(transport);
   const pricesWritable = supportsAdminPrices(transport);
   const capabilities = [
-    ["Products", `${summary.products} catalog products`, productsWritable ? "Catalog and localized copy are editable below." : "Catalog editing requires an administrator transport."],
-    ["Prices", `${summary.pricedProducts} priced · ${summary.unpricedProducts} unpriced`, pricesWritable ? "Revisioned proposals and append-only history are available below." : "Price administration requires an administrator transport."],
-    ["Users", "Roles and access", "User search and role changes will use internal user IDs."],
-    ["Orders", "Quote and order lifecycle", "Order history and operations will preserve core lifecycle rules."],
-    ["Listings", "Broker inventory", "Admin-wide listing visibility follows broker-owned listing contracts."],
-    ["Fulfillment", "Manual operations", "Task claiming and completion are the final pre-wallet capability."]
+    [
+      i18n.t("admin.products"),
+      i18n.t("admin.productsMetric", { count: summary.products }),
+      i18n.t(productsWritable ? "admin.productsReady" : "admin.productsUnavailable")
+    ],
+    [
+      i18n.t("admin.prices"),
+      i18n.t("admin.pricesMetric", { priced: summary.pricedProducts, unpriced: summary.unpricedProducts }),
+      i18n.t(pricesWritable ? "admin.pricesReady" : "admin.pricesUnavailable")
+    ],
+    [i18n.t("admin.users"), i18n.t("admin.usersMetric"), i18n.t("admin.usersNote")],
+    [i18n.t("admin.orders"), i18n.t("admin.ordersMetric"), i18n.t("admin.ordersNote")],
+    [i18n.t("admin.listings"), i18n.t("admin.listingsMetric"), i18n.t("admin.listingsNote")],
+    [i18n.t("admin.fulfillment"), i18n.t("admin.fulfillmentMetric"), i18n.t("admin.fulfillmentNote")]
   ];
 
   for (const [name, metric, note] of capabilities) {
@@ -78,10 +88,10 @@ export function mountAdminWorkspace({
   root.append(title, description, grid);
   container.append(root);
   const products = productsWritable
-    ? mountAdminProducts({ document, session, transport, locale, container: root })
+    ? mountAdminProducts({ document, session, transport, locale: i18n.locale, container: root })
     : null;
   const prices = pricesWritable
-    ? mountAdminPrices({ document, session, transport, locale, container: root })
+    ? mountAdminPrices({ document, session, transport, locale: i18n.locale, container: root })
     : null;
   const ready = Promise.all([
     products?.ready || Promise.resolve(null),

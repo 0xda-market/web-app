@@ -1,3 +1,5 @@
+import { createI18n } from "./i18n.js";
+
 function element(document, tag, attributes = {}, text = null) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attributes)) {
@@ -116,21 +118,22 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
   if (!document?.createElement) throw new TypeError("document is required");
   if (!container?.append) throw new TypeError("admin prices container is required");
 
-  const controller = createAdminPricingController({ transport, locale });
+  const i18n = createI18n(locale);
+  const controller = createAdminPricingController({ transport, locale: i18n.locale });
   const root = element(document, "section", { id: "admin-prices", className: "admin-prices" });
-  const heading = element(document, "h3", {}, "Prices");
-  const description = element(document, "p", {}, "Apply one atomic catalog-wide price revision and review the append-only audit history.");
-  const status = element(document, "p", { className: "admin-prices-status", role: "status" }, "Loading prices…");
+  const heading = element(document, "h3", {}, i18n.t("prices.title"));
+  const description = element(document, "p", {}, i18n.t("prices.description"));
+  const status = element(document, "p", { className: "admin-prices-status", role: "status" }, i18n.t("prices.loading"));
   const form = element(document, "form", { className: "admin-price-form" });
   const rows = element(document, "div", { className: "admin-price-rows" });
-  const applyButton = element(document, "button", { type: "submit" }, "Review application");
-  const historyHeading = element(document, "h4", {}, "Recent history");
+  const applyButton = element(document, "button", { type: "submit" }, i18n.t("prices.review"));
+  const historyHeading = element(document, "h4", {}, i18n.t("prices.history"));
   const historyList = element(document, "div", { className: "admin-price-history" });
   let armed = false;
 
   function resetConfirmation() {
     armed = false;
-    applyButton.textContent = "Review application";
+    applyButton.textContent = i18n.t("prices.review");
   }
 
   function renderHistory(items) {
@@ -139,7 +142,7 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
       row.append(
         element(document, "strong", {}, entry.sku),
         element(document, "span", {}, `${entry.amount} USDT`),
-        element(document, "time", {}, entry.appliedAt || "unknown time")
+        element(document, "time", {}, entry.appliedAt || i18n.t("prices.unknownTime"))
       );
       return row;
     }));
@@ -153,7 +156,7 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
         type: "text",
         inputmode: "decimal",
         "data-sku": entry.sku,
-        "aria-label": `${entry.name} price in USDT`
+        "aria-label": i18n.t("prices.inputLabel", { name: entry.name })
       });
       input.value = entry.amount;
       input.addEventListener("input", (event) => {
@@ -162,13 +165,16 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
       });
       row.append(
         element(document, "strong", {}, entry.name),
-        element(document, "span", {}, `Current: ${entry.currentAmount || "—"} · Previous: ${entry.previousAmount || "—"}`),
+        element(document, "span", {}, i18n.t("prices.currentPrevious", {
+          current: entry.currentAmount || "—",
+          previous: entry.previousAmount || "—"
+        })),
         input
       );
       return row;
     }));
     renderHistory(state.history);
-    status.textContent = `${state.entries.length} prices · revision ${state.revision}`;
+    status.textContent = i18n.t("prices.summary", { count: state.entries.length, revision: state.revision });
     resetConfirmation();
   }
 
@@ -178,15 +184,15 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
       const prices = controller.application();
       if (!armed) {
         armed = true;
-        applyButton.textContent = `Confirm ${prices.length} prices`;
-        status.textContent = `Review revision ${controller.state().revision} before applying.`;
+        applyButton.textContent = i18n.t("prices.confirm", { count: prices.length });
+        status.textContent = i18n.t("prices.reviewRevision", { revision: controller.state().revision });
         return;
       }
       applyButton.disabled = true;
-      status.textContent = "Applying prices…";
+      status.textContent = i18n.t("prices.applying");
       await controller.apply();
       render();
-      status.textContent = "Prices applied atomically.";
+      status.textContent = i18n.t("prices.applied");
     } catch (error) {
       status.textContent = error.message;
       resetConfirmation();

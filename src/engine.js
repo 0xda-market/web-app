@@ -186,19 +186,31 @@ export class CheckoutController {
 
   reset(product = null) {
     this.#operationVersion += 1;
-    this.#state = immutable(product ? { status: "idle", product } : { status: "idle" });
+    this.#state = immutable(product ? { status: "idle", product, quantity: "1" } : { status: "idle" });
     return this.#state;
   }
 
-  async quote(product) {
+  async quote(product, quantity = "1") {
     assert(product?.id, "a product is required before quoting");
+    const normalizedQuantity = String(quantity || "").trim();
+    assert(/^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/.test(normalizedQuantity) && /[1-9]/.test(normalizedQuantity),
+      "quantity must be a positive decimal with at most 12 fractional digits");
     const operation = ++this.#operationVersion;
-    this.#state = immutable({ status: "quoting", product });
+    this.#state = immutable({ status: "quoting", product, quantity: normalizedQuantity });
     try {
-      const quote = await this.#gateway.quote(product.id);
-      if (operation === this.#operationVersion) this.#state = immutable({ status: "quoted", product, quote });
+      const quote = await this.#gateway.quote(product.id, normalizedQuantity);
+      if (operation === this.#operationVersion) {
+        this.#state = immutable({ status: "quoted", product, quantity: normalizedQuantity, quote });
+      }
     } catch (error) {
-      if (operation === this.#operationVersion) this.#state = immutable({ status: "failed", product, error: String(error.message ?? error) });
+      if (operation === this.#operationVersion) {
+        this.#state = immutable({
+          status: "failed",
+          product,
+          quantity: normalizedQuantity,
+          error: String(error.message ?? error)
+        });
+      }
     }
     return this.#state;
   }
@@ -206,13 +218,23 @@ export class CheckoutController {
   async accept() {
     assert(this.#state.status === "quoted", "a quote must be loaded before acceptance");
     const operation = ++this.#operationVersion;
-    const { product, quote } = this.#state;
-    this.#state = immutable({ status: "accepting", product, quote });
+    const { product, quantity, quote } = this.#state;
+    this.#state = immutable({ status: "accepting", product, quantity, quote });
     try {
       const order = await this.#gateway.accept(quote.id);
-      if (operation === this.#operationVersion) this.#state = immutable({ status: order.attributes.status, product, quote, order });
+      if (operation === this.#operationVersion) {
+        this.#state = immutable({ status: order.attributes.status, product, quantity, quote, order });
+      }
     } catch (error) {
-      if (operation === this.#operationVersion) this.#state = immutable({ status: "failed", product, quote, error: String(error.message ?? error) });
+      if (operation === this.#operationVersion) {
+        this.#state = immutable({
+          status: "failed",
+          product,
+          quantity,
+          quote,
+          error: String(error.message ?? error)
+        });
+      }
     }
     return this.#state;
   }
@@ -220,13 +242,24 @@ export class CheckoutController {
   async refresh() {
     assert(this.#state.order?.id, "an order must exist before refresh");
     const operation = ++this.#operationVersion;
-    const { product, quote, order } = this.#state;
-    this.#state = immutable({ status: "refreshing", product, quote, order });
+    const { product, quantity, quote, order } = this.#state;
+    this.#state = immutable({ status: "refreshing", product, quantity, quote, order });
     try {
       const refreshed = await this.#gateway.refresh(order.id);
-      if (operation === this.#operationVersion) this.#state = immutable({ status: refreshed.attributes.status, product, quote, order: refreshed });
+      if (operation === this.#operationVersion) {
+        this.#state = immutable({ status: refreshed.attributes.status, product, quantity, quote, order: refreshed });
+      }
     } catch (error) {
-      if (operation === this.#operationVersion) this.#state = immutable({ status: "failed", product, quote, order, error: String(error.message ?? error) });
+      if (operation === this.#operationVersion) {
+        this.#state = immutable({
+          status: "failed",
+          product,
+          quantity,
+          quote,
+          order,
+          error: String(error.message ?? error)
+        });
+      }
     }
     return this.#state;
   }

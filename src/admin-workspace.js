@@ -1,3 +1,4 @@
+import { mountAdminCreateProduct } from "./admin-create-product.js";
 import { mountAdminPrices } from "./admin-prices.js";
 import { mountAdminProducts } from "./admin-products.js";
 import { createI18n } from "./i18n.js";
@@ -15,6 +16,10 @@ function element(document, tag, attributes = {}, text = null) {
 function supportsAdminProducts(transport) {
   return ["listAdminProducts", "updateAdminProduct", "saveAdminProductLocalization"]
     .every((method) => typeof transport?.[method] === "function");
+}
+
+function supportsAdminProductCreation(transport) {
+  return typeof transport?.createAdminProduct === "function";
 }
 
 function supportsAdminPrices(transport) {
@@ -57,6 +62,7 @@ export function mountAdminWorkspace({
   );
   const grid = element(document, "div", { className: "admin-capability-grid" });
   const productsWritable = supportsAdminProducts(transport);
+  const productsCreatable = supportsAdminProductCreation(transport);
   const pricesWritable = supportsAdminPrices(transport);
   const capabilities = [
     [
@@ -90,6 +96,16 @@ export function mountAdminWorkspace({
   const products = productsWritable
     ? mountAdminProducts({ document, session, transport, locale: i18n.locale, container: root })
     : null;
+  const createProduct = productsCreatable
+    ? mountAdminCreateProduct({
+      document,
+      session,
+      transport,
+      locale: i18n.locale,
+      container: root,
+      onCreated: (resource) => products?.reload(resource?.id)
+    })
+    : null;
   const prices = pricesWritable
     ? mountAdminPrices({ document, session, transport, locale: i18n.locale, container: root })
     : null;
@@ -97,5 +113,5 @@ export function mountAdminWorkspace({
     products?.ready || Promise.resolve(null),
     prices?.ready || Promise.resolve(null)
   ]);
-  return { root, summary, products, prices, ready };
+  return { root, summary, products, createProduct, prices, ready };
 }

@@ -58,8 +58,33 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     previous: required("#previous"), products: required("#products"), search: required("#search"), snapshot: required("#snapshot"), status: required("#status")
   };
 
+  function checkoutQuantityControl() {
+    const existing = document.querySelector("#checkout-quantity");
+    if (existing) return existing;
+
+    const label = document.createElement("label");
+    label.className = "checkout-quantity-field";
+    const caption = document.createElement("span");
+    caption.textContent = i18n.t("checkout.quantity");
+    const input = document.createElement("input");
+    input.id = "checkout-quantity";
+    input.name = "quantity";
+    input.type = "number";
+    input.inputMode = "decimal";
+    input.min = "0.000000000001";
+    input.step = "any";
+    input.required = true;
+    input.value = "1";
+    input.setAttribute("aria-label", i18n.t("checkout.quantity"));
+    label.append(caption, input);
+    elements.dialog.append(label);
+    return input;
+  }
+
+  elements.quantity = checkoutQuantityControl();
+
   const checkout = new engine.CheckoutController({
-    quote: (sku) => transport.quote({ sku, locale: i18n.locale }),
+    quote: (sku, quantity) => transport.quote({ sku, quantity, locale: i18n.locale }),
     accept: (quoteId) => transport.acceptQuote({ quoteId }),
     refresh: (orderId) => transport.refreshOrder({ orderId })
   });
@@ -79,6 +104,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     elements.next.setAttribute("aria-label", i18n.t("navigation.next"));
     elements.home.textContent = i18n.t("navigation.categories");
     elements.closeDialog.setAttribute("aria-label", i18n.t("checkout.close"));
+    elements.quantity.setAttribute("aria-label", i18n.t("checkout.quantity"));
     elements.action.textContent = i18n.t("checkout.requestQuote");
     document.querySelector(".navigation")?.setAttribute?.("aria-label", i18n.t("navigation.pages"));
   }
@@ -125,17 +151,24 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
       succeeded: [i18n.t("checkout.completed"), i18n.t("checkout.requestNew"), false],
       failed: [state.error || i18n.t("checkout.failed"), i18n.t("checkout.retry"), false]
     };
+    const quotedTotal = state.quote?.attributes?.total_price_usdt;
+    const quotedCurrency = state.quote?.attributes?.currency || "USDT";
     const row = state.status === "quoted"
-      ? [i18n.t("checkout.quoteExpires", {
+      ? [i18n.t("checkout.quoteSummary", {
+        quantity: state.quantity,
+        total: quotedTotal || "—",
+        currency: quotedCurrency,
         time: new Date(state.quote.attributes.expires_at).toLocaleTimeString(i18n.locale.replace("_", "-"))
       }), i18n.t("checkout.confirm"), false]
       : (rows[state.status] || rows.idle);
     [elements.dialogStatus.textContent, elements.action.textContent, elements.action.disabled] = row;
+    elements.quantity.disabled = !["idle", "failed", "succeeded"].includes(state.status);
   }
 
   function openCheckout(product) {
     selectedProduct = product;
     checkout.reset(product);
+    elements.quantity.value = "1";
     elements.dialogCategory.textContent = i18n.category(product.category.id, product.category.label);
     elements.dialogName.textContent = product.attributes.name;
     elements.dialogPrice.textContent = engine.formatPrice(product) || i18n.t("catalog.unavailable");
@@ -146,7 +179,8 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
 
   async function performCheckout() {
     const status = checkout.state.status;
-    const operation = ["idle", "failed", "succeeded"].includes(status) ? checkout.quote(selectedProduct)
+    const operation = ["idle", "failed", "succeeded"].includes(status)
+      ? checkout.quote(selectedProduct, elements.quantity.value)
       : status === "quoted" ? checkout.accept()
       : ["pending", "accepted"].includes(status) ? checkout.refresh() : null;
     if (!operation) return;
@@ -215,6 +249,7 @@ export { createI18n, normalizeLocale } from "./i18n.js";
 export { mountBrokerWorkspace, brokerStorageKey } from "./broker-workspace.js";
 export { mountAdminWorkspace, adminWorkspaceSummary } from "./admin-workspace.js";
 export { createAdminCatalogController, mountAdminProducts } from "./admin-products.js";
+export { createAdminProductController, mountAdminCreateProduct } from "./admin-create-product.js";
 export { createAdminPricingController, mountAdminPrices } from "./admin-prices.js";
 export { mountWorkspaceNavigation, workspaceSectionsForRole } from "./workspace-navigation.js";
 export * from "./engine.js";

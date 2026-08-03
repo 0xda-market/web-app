@@ -84,7 +84,15 @@ Each capability must introduce or reuse an explicit provider-neutral core API, a
 
 Hosts must consume an immutable commit or released package version. Mutable default-branch module URLs are not a supported production contract.
 
-## Development deployment
+## Deployment
+
+The repository has one `Deploy` workflow.
+
+- automatic deployment runs only when a pull request into `master` is actually merged;
+- synchronizing or updating an open pull request does not create a deployment run;
+- closing a pull request without merging skips the deploy job;
+- manual dispatch requires an explicit source branch, tag, or commit and an environment;
+- only the `development` runtime is currently supported by `deploy/deploy.sh`.
 
 The `development` GitHub environment requires:
 

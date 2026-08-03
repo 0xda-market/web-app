@@ -37,10 +37,14 @@ function positiveDecimal(value, scale) {
 
 function normalizeListing(resource) {
   const attributes = resource?.attributes || {};
+  const quantity = String(attributes.quantity || "");
   return Object.freeze({
     id: String(resource?.id || ""),
     sku: String(attributes.sku || ""),
-    quantity: String(attributes.quantity || ""),
+    quantity,
+    availableQuantity: String(attributes.available_quantity ?? quantity),
+    reservedQuantity: String(attributes.reserved_quantity ?? "0"),
+    soldQuantity: String(attributes.sold_quantity ?? "0"),
     priceAmount: String(attributes.price_amount || ""),
     currency: String(attributes.currency || ""),
     status: String(attributes.status || ""),
@@ -128,7 +132,12 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
       const card = element(document, "article", { className: "broker-listing" });
       card.append(
         element(document, "strong", {}, productEntry?.attributes?.name || listing.sku),
-        element(document, "span", {}, `${listing.quantity} × ${listing.priceAmount} ${listing.currency}`)
+        element(document, "span", {}, `${listing.quantity} × ${listing.priceAmount} ${listing.currency}`),
+        element(document, "small", { className: "broker-listing-inventory" }, i18n.t("broker.inventory", {
+          available: listing.availableQuantity,
+          reserved: listing.reservedQuantity,
+          sold: listing.soldQuantity
+        }))
       );
       const edit = element(document, "button", { type: "button" }, i18n.t("broker.edit"));
       edit.addEventListener("click", () => {

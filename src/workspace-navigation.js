@@ -1,3 +1,5 @@
+import { createI18n } from "./i18n.js";
+
 const ROLE_SECTIONS = Object.freeze({
   client: Object.freeze(["market"]),
   broker: Object.freeze(["market", "listings"]),
@@ -23,12 +25,14 @@ export function mountWorkspaceNavigation({
   document,
   session,
   sections,
+  locale = "en_US",
   initialSection = "market",
   selectionFeedback = () => {}
 }) {
   if (!document?.createElement) throw new TypeError("document is required");
   if (!Array.isArray(sections)) throw new TypeError("workspace sections are required");
 
+  const i18n = createI18n(locale);
   const allowed = new Set(workspaceSectionsForRole(session?.role));
   const entries = sections.filter((entry) => allowed.has(entry?.id) && entry?.root);
   if (entries.length === 0) throw new TypeError("at least one permitted workspace section is required");
@@ -37,7 +41,7 @@ export function mountWorkspaceNavigation({
     id: "workspace-navigation",
     className: "workspace-navigation",
     role: "tablist",
-    "aria-label": "Workspace"
+    "aria-label": i18n.t("workspace.label")
   });
   const buttons = new Map();
   let activeSection = null;
@@ -60,7 +64,7 @@ export function mountWorkspaceNavigation({
       role: "tab",
       "data-workspace": entry.id,
       "aria-selected": "false"
-    }, entry.label || entry.id);
+    }, entry.label || i18n.t(`workspace.${entry.id}`));
     button.addEventListener("click", () => select(entry.id));
     buttons.set(entry.id, button);
     root.append(button);

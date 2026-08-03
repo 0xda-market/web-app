@@ -1,6 +1,7 @@
 import { assertHost, assertTransport } from "./contracts.js";
 import * as bundledEngine from "./engine.js";
 import { createI18n, normalizeLocale } from "./i18n.js";
+import { paymentPendingMessage } from "./payment-status.js";
 
 function immutable(value) {
   if (Array.isArray(value)) value.forEach(immutable);
@@ -146,6 +147,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
       quoting: [i18n.t("checkout.requesting"), i18n.t("checkout.requestQuote"), true],
       accepting: [i18n.t("checkout.creating"), i18n.t("checkout.confirm"), true],
       refreshing: [i18n.t("checkout.refreshing"), i18n.t("checkout.refresh"), true],
+      payment_pending: [paymentPendingMessage(state.order, i18n.locale), i18n.t("checkout.refresh"), false],
       pending: [i18n.t("checkout.processing"), i18n.t("checkout.refresh"), false],
       accepted: [i18n.t("checkout.processing"), i18n.t("checkout.refresh"), false],
       succeeded: [i18n.t("checkout.completed"), i18n.t("checkout.requestNew"), false],
@@ -182,7 +184,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     const operation = ["idle", "failed", "succeeded"].includes(status)
       ? checkout.quote(selectedProduct, elements.quantity.value)
       : status === "quoted" ? checkout.accept()
-      : ["pending", "accepted"].includes(status) ? checkout.refresh() : null;
+      : ["payment_pending", "pending", "accepted"].includes(status) ? checkout.refresh() : null;
     if (!operation) return;
     renderCheckout();
     await operation;
@@ -246,6 +248,7 @@ export async function mountMarketApp(options) {
 }
 
 export { createI18n, normalizeLocale } from "./i18n.js";
+export { paymentPendingMessage } from "./payment-status.js";
 export { mountBrokerWorkspace, brokerStorageKey } from "./broker-workspace.js";
 export { mountAdminWorkspace, adminWorkspaceSummary } from "./admin-workspace.js";
 export { createAdminCatalogController, mountAdminProducts } from "./admin-products.js";

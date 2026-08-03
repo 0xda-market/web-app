@@ -1,6 +1,6 @@
 {
   "name": "@0xda-market/webapp-core",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -8,6 +8,7 @@
     "./contracts": "./src/contracts.js",
     "./engine": "./src/engine.js",
     "./i18n": "./src/i18n.js",
+    "./payment-status": "./src/payment-status.js",
     "./broker-workspace": "./src/broker-workspace.js",
     "./admin-workspace": "./src/admin-workspace.js",
     "./admin-products": "./src/admin-products.js",
@@ -16,7 +17,7 @@
     "./workspace-navigation": "./src/workspace-navigation.js"
   },
   "scripts": {
-    "check": "node --check src/index.js && node --check src/contracts.js && node --check src/engine.js && node --check src/i18n.js && node --check src/broker-workspace.js && node --check src/admin-workspace.js && node --check src/admin-products.js && node --check src/admin-create-product.js && node --check src/admin-prices.js && node --check src/workspace-navigation.js",
+    "check": "node --check src/index.js && node --check src/contracts.js && node --check src/engine.js && node --check src/i18n.js && node --check src/payment-status.js && node --check src/broker-workspace.js && node --check src/admin-workspace.js && node --check src/admin-products.js && node --check src/admin-create-product.js && node --check src/admin-prices.js && node --check src/workspace-navigation.js",
     "test": "node --test"
   },
   "engines": {

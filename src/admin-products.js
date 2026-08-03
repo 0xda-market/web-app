@@ -1,3 +1,5 @@
+import { createI18n } from "./i18n.js";
+
 function element(document, tag, attributes = {}, text = null) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attributes)) {
@@ -116,25 +118,28 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
   if (!document?.createElement) throw new TypeError("document is required");
   if (!container?.append) throw new TypeError("admin products container is required");
 
-  const controller = createAdminCatalogController({ transport, locale });
+  const i18n = createI18n(locale);
+  const controller = createAdminCatalogController({ transport, locale: i18n.locale });
   const root = element(document, "section", { id: "admin-products", className: "admin-products" });
-  const heading = element(document, "h3", {}, "Products");
-  const description = element(document, "p", {}, "Edit locale-neutral catalog state and user-facing localizations independently.");
-  const status = element(document, "p", { className: "admin-products-status", role: "status" }, "Loading products…");
-  const productSelect = element(document, "select", { "aria-label": "Product" });
+  const heading = element(document, "h3", {}, i18n.t("products.title"));
+  const description = element(document, "p", {}, i18n.t("products.description"));
+  const status = element(document, "p", { className: "admin-products-status", role: "status" }, i18n.t("products.loading"));
+  const productSelect = element(document, "select", { "aria-label": i18n.t("products.product") });
   const productForm = element(document, "form", { className: "admin-product-form" });
   const shortName = element(document, "input", { name: "short_name", required: "required", maxlength: "64" });
   const productStatus = element(document, "select", { name: "status" });
-  for (const value of ["active", "inactive"]) productStatus.append(element(document, "option", { value }, value));
+  for (const value of ["active", "inactive"]) {
+    productStatus.append(element(document, "option", { value }, i18n.t(`products.${value}`)));
+  }
   const position = element(document, "input", { name: "position", type: "number", min: "0", step: "1", required: "required" });
   const marketable = element(document, "input", { name: "marketable", type: "checkbox" });
   const metadata = element(document, "textarea", { name: "metadata", rows: "6" });
-  const saveProduct = element(document, "button", { type: "submit" }, "Save product");
+  const saveProduct = element(document, "button", { type: "submit" }, i18n.t("products.save"));
   const localizationForm = element(document, "form", { className: "admin-localization-form" });
   const localizationLocale = element(document, "input", { name: "locale", required: "required", placeholder: "uk_UA" });
   const fullName = element(document, "input", { name: "full_name", required: "required", maxlength: "160" });
   const buttonLabel = element(document, "input", { name: "button_label", required: "required", maxlength: "64" });
-  const saveLocalization = element(document, "button", { type: "submit" }, "Save localization");
+  const saveLocalization = element(document, "button", { type: "submit" }, i18n.t("products.saveLocalization"));
   const localizationList = element(document, "div", { className: "admin-localization-list" });
 
   function field(label, control) {
@@ -170,13 +175,13 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
       button.addEventListener("click", () => fillLocalization(localization));
       return button;
     }));
-    fillLocalization(current.localizations.find((entry) => entry.locale === locale) || current.localizations[0]);
+    fillLocalization(current.localizations.find((entry) => entry.locale === i18n.locale) || current.localizations[0]);
   }
 
   function renderProducts() {
     const state = controller.state();
     productSelect.replaceChildren(...state.products.map((product) =>
-      element(document, "option", { value: product.id }, `${product.shortName} · ${product.status}`)
+      element(document, "option", { value: product.id }, `${product.shortName} · ${i18n.t(`products.${product.status}`)}`)
     ));
     renderSelected();
   }
@@ -188,11 +193,11 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
   productForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     saveProduct.disabled = true;
-    status.textContent = "Saving product…";
+    status.textContent = i18n.t("products.saving");
     try {
       const parsedMetadata = JSON.parse(metadata.value || "{}");
       if (!parsedMetadata || Array.isArray(parsedMetadata) || typeof parsedMetadata !== "object") {
-        throw new TypeError("metadata must be a JSON object");
+        throw new TypeError(i18n.t("products.metadataError"));
       }
       await controller.updateProduct({
         short_name: shortName.value.trim(),
@@ -202,7 +207,7 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
         metadata: parsedMetadata
       });
       renderProducts();
-      status.textContent = "Product saved.";
+      status.textContent = i18n.t("products.saved");
     } catch (error) {
       status.textContent = error.message;
     } finally {
@@ -212,7 +217,7 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
   localizationForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     saveLocalization.disabled = true;
-    status.textContent = "Saving localization…";
+    status.textContent = i18n.t("products.savingLocalization");
     try {
       await controller.saveLocalization({
         locale: localizationLocale.value,
@@ -220,7 +225,7 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
         buttonLabel: buttonLabel.value.trim()
       });
       renderSelected();
-      status.textContent = "Localization saved.";
+      status.textContent = i18n.t("products.localizationSaved");
     } catch (error) {
       status.textContent = error.message;
     } finally {
@@ -229,17 +234,17 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
   });
 
   productForm.append(
-    field("Short name", shortName),
-    field("Status", productStatus),
-    field("Position", position),
-    field("Marketable", marketable),
-    field("Metadata (JSON)", metadata),
+    field(i18n.t("products.shortName"), shortName),
+    field(i18n.t("products.status"), productStatus),
+    field(i18n.t("products.position"), position),
+    field(i18n.t("products.marketable"), marketable),
+    field(i18n.t("products.metadata"), metadata),
     saveProduct
   );
   localizationForm.append(
-    field("Locale", localizationLocale),
-    field("Full name", fullName),
-    field("Button label", buttonLabel),
+    field(i18n.t("products.locale"), localizationLocale),
+    field(i18n.t("products.fullName"), fullName),
+    field(i18n.t("products.buttonLabel"), buttonLabel),
     saveLocalization
   );
   root.append(heading, description, status, productSelect, productForm, localizationList, localizationForm);
@@ -247,7 +252,7 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
 
   const ready = controller.load().then(() => {
     renderProducts();
-    status.textContent = `${controller.state().products.length} products.`;
+    status.textContent = i18n.t("products.count", { count: controller.state().products.length });
     return controller.state();
   }).catch((error) => {
     status.textContent = error.message;

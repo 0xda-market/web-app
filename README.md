@@ -51,6 +51,16 @@ An administrator host may supply:
 
 `createAdminCatalogController` keeps locale-neutral product versions independent from localization versions. `mountAdminProducts` exposes short name, status, position, marketability, metadata and localized copy. It never edits SKU or price state. Stale writes remain server-defined concurrency errors and are surfaced to the user without browser-side retries.
 
+## Price proposals, application and history
+
+An administrator host may supply:
+
+- `getAdminPriceProposal({ locale })`;
+- `applyAdminPrices({ revision, prices })`;
+- `listAdminPriceHistory({ limit })`.
+
+`createAdminPricingController` preserves the proposal revision and submits it with one complete catalog-wide application. Every active product and currency requires a positive USDT amount before the user can confirm. `mountAdminPrices` uses a two-step review and confirmation flow, then reloads the authoritative proposal and append-only history. A concurrent application remains a server-defined `concurrency_conflict`; the browser does not retry or merge stale values.
+
 ## Pre-wallet delivery sequence
 
 The implementation order preserves existing core contracts:
@@ -74,7 +84,15 @@ Each capability must introduce or reuse an explicit provider-neutral core API, a
 
 Hosts must consume an immutable commit or released package version. Mutable default-branch module URLs are not a supported production contract.
 
-## Development deployment
+## Deployment
+
+The repository has one `Deploy` workflow.
+
+- automatic deployment runs only when a pull request into `master` is actually merged;
+- synchronizing or updating an open pull request does not create a deployment run;
+- closing a pull request without merging skips the deploy job;
+- manual dispatch requires an explicit source branch, tag, or commit and an environment;
+- only the `development` runtime is currently supported by `deploy/deploy.sh`.
 
 The `development` GitHub environment requires:
 

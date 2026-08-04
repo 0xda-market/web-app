@@ -65,3 +65,44 @@ test("falls back to scrollIntoView when VisualViewport is unavailable", () => {
 
   assert.deepEqual(calls, [{ behavior: "smooth", block: "center", inline: "nearest" }]);
 });
+
+test("dismisses a focused field from a confirmation control above the keyboard", () => {
+  const document = new EventSource();
+  const viewport = Object.assign(new EventSource(), { height: 800, offsetTop: 0 });
+  const windowTarget = Object.assign(new EventSource(), {
+    innerHeight: 800,
+    requestAnimationFrame(callback) { callback(); }
+  });
+  const confirmationControl = Object.assign(new EventSource(), { hidden: true, style: {} });
+  let blurCount = 0;
+  const field = {
+    matches(selector) { return selector.includes("input"); },
+    getBoundingClientRect() { return { top: 200, bottom: 240 }; },
+    blur() { blurCount += 1; }
+  };
+
+  const mounted = mountMobileInputVisibility({
+    document,
+    viewport,
+    windowTarget,
+    confirmationControl
+  });
+  document.dispatch("focusin", { target: field });
+
+  assert.equal(confirmationControl.hidden, false);
+  assert.equal(confirmationControl.style.top, "800px");
+
+  viewport.height = 420;
+  viewport.dispatch("resize");
+  assert.equal(confirmationControl.style.top, "420px");
+
+  let focusPreserved = false;
+  confirmationControl.dispatch("pointerdown", { preventDefault() { focusPreserved = true; } });
+  assert.equal(focusPreserved, true);
+
+  confirmationControl.dispatch("click");
+  assert.equal(blurCount, 1);
+  assert.equal(confirmationControl.hidden, true);
+
+  mounted.dispose();
+});

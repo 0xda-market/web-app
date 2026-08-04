@@ -35,6 +35,8 @@ Every quantity, amount, client-price and catalog-position field uses a native nu
 
 `mountMarketApp` also installs one delegated focus-visibility handler for the complete shared surface. It follows `VisualViewport` resize and scroll events while a field is focused, then centers an obscured field inside the visible viewport as the on-screen keyboard opens. Hosts without `VisualViewport` support fall back to `scrollIntoView`; Telegram-specific viewport state remains outside this package.
 
+A host may expose one `[data-mobile-input-confirm]` button as a keyboard accessory. The shared handler keeps it anchored to the bottom-right edge of the visible viewport while any input or textarea is focused. Activating it only blurs the active field and closes the on-screen keyboard; it never submits a form or starts a transport operation. Copy and visual presentation remain host-owned.
+
 ## Marketplace checkout
 
 The buyer selects a product and an explicit quantity. The shared checkout calls:

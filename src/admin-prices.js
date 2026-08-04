@@ -161,8 +161,10 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
     rows.replaceChildren(...state.entries.map((entry) => {
       const row = element(document, "label", { className: "admin-price-row" });
       const input = element(document, "input", {
-        type: "text",
+        type: "number",
         inputmode: "decimal",
+        min: "0.000001",
+        step: "any",
         "data-sku": entry.sku,
         "aria-label": i18n.t("prices.inputLabel", { name: entry.name })
       });

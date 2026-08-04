@@ -8,6 +8,7 @@
     "./contracts": "./src/contracts.js",
     "./engine": "./src/engine.js",
     "./i18n": "./src/i18n.js",
+    "./mobile-inputs": "./src/mobile-inputs.js",
     "./payment-status": "./src/payment-status.js",
     "./pending-section": "./src/pending-section.js",
     "./broker-workspace": "./src/broker-workspace.js",
@@ -18,7 +19,7 @@
     "./workspace-navigation": "./src/workspace-navigation.js"
   },
   "scripts": {
-    "check": "node --check src/index.js && node --check src/contracts.js && node --check src/engine.js && node --check src/i18n.js && node --check src/payment-status.js && node --check src/pending-section.js && node --check src/broker-workspace.js && node --check src/admin-workspace.js && node --check src/admin-products.js && node --check src/admin-create-product.js && node --check src/admin-prices.js && node --check src/workspace-navigation.js",
+    "check": "node --check src/index.js && node --check src/contracts.js && node --check src/engine.js && node --check src/i18n.js && node --check src/mobile-inputs.js && node --check src/payment-status.js && node --check src/pending-section.js && node --check src/broker-workspace.js && node --check src/admin-workspace.js && node --check src/admin-products.js && node --check src/admin-create-product.js && node --check src/admin-prices.js && node --check src/workspace-navigation.js",
     "test": "node --test"
   },
   "engines": {

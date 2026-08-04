@@ -29,6 +29,12 @@ Production adapters belong to their channel repositories:
 
 This package contains no `Telegram.WebApp`, `initData`, Telegram endpoint, OAuth or browser-session implementation.
 
+## Mobile form behavior
+
+Every quantity, amount, client-price and catalog-position field uses a native numeric input contract with a decimal or integer mobile keyboard as appropriate. Text identifiers such as SKU and locale remain text fields.
+
+`mountMarketApp` also installs one delegated focus-visibility handler for the complete shared surface. It follows `VisualViewport` resize and scroll events while a field is focused, then centers an obscured field inside the visible viewport as the on-screen keyboard opens. Hosts without `VisualViewport` support fall back to `scrollIntoView`; Telegram-specific viewport state remains outside this package.
+
 ## Marketplace checkout
 
 The buyer selects a product and an explicit quantity. The shared checkout calls:

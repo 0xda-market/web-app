@@ -1,6 +1,7 @@
 import { assertHost, assertTransport } from "./contracts.js";
 import * as bundledEngine from "./engine.js";
 import { createI18n, normalizeLocale } from "./i18n.js";
+import { mountMobileInputVisibility } from "./mobile-inputs.js";
 import { paymentPendingMessage } from "./payment-status.js";
 import { setSectionPending } from "./pending-section.js";
 
@@ -42,6 +43,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     throw new TypeError("engine must provide catalog and checkout primitives");
   }
   if (!document?.querySelector || !document?.createElement) throw new TypeError("document is required");
+  mountMobileInputVisibility({ document });
 
   const i18n = createI18n(host.locale());
   let store;
@@ -256,6 +258,7 @@ export async function mountMarketApp(options) {
 export { createI18n, normalizeLocale } from "./i18n.js";
 export { paymentPendingMessage } from "./payment-status.js";
 export { setSectionPending } from "./pending-section.js";
+export { mountMobileInputVisibility } from "./mobile-inputs.js";
 export { mountBrokerWorkspace, brokerStorageKey } from "./broker-workspace.js";
 export { mountAdminWorkspace, adminWorkspaceSummary } from "./admin-workspace.js";
 export { createAdminCatalogController, mountAdminProducts } from "./admin-products.js";

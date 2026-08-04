@@ -157,9 +157,14 @@ test("admin workspace mounts product creation and refreshes the editor to the ne
   assert.equal(workspace.products.root.attributes.id, "admin-products");
   assert.equal(workspace.createProduct.root.attributes.id, "admin-create-product");
   assert.equal(workspace.products.controller.state().products.length, 1);
+  const editorPosition = workspace.products.productForm.children[2].children[1];
+  assert.equal(editorPosition.type, "number");
+  assert.equal(editorPosition.attributes.inputmode, "numeric");
 
   const controls = workspace.createProduct.form.children.map((label) => label.children?.[1]).filter(Boolean);
   const [sku, shortName, position, marketable, metadata, locale, fullName, buttonLabel] = controls;
+  assert.equal(position.type, "number");
+  assert.equal(position.attributes.inputmode, "numeric");
   sku.value = "premium_12m";
   shortName.value = "Premium · 12m";
   position.value = "3";

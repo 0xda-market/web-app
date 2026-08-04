@@ -32,6 +32,8 @@ test("mounts a complete transport document with catalog, locale, session and cur
   const quantityField = document.elements["checkout-dialog"].children.at(-1);
   assert.equal(quantityField.className, "checkout-quantity-field");
   assert.equal(quantityField.children[1].value, "1");
+  assert.equal(quantityField.children[1].type, "number");
+  assert.equal(quantityField.children[1].inputMode, "decimal");
 });
 
 test("requests and accepts a quote for the exact client quantity", async () => {
@@ -229,6 +231,10 @@ test("publishes and withdraws listings with exact decimal strings", async () => 
   const [, , form] = workspace.root.children;
   const controls = form.children.map((label) => label.children?.[1]).filter(Boolean);
   const [product, quantity, amount, currency] = controls;
+  assert.equal(quantity.type, "number");
+  assert.equal(quantity.attributes.inputmode, "decimal");
+  assert.equal(amount.type, "number");
+  assert.equal(amount.attributes.inputmode, "decimal");
   product.value = "product_1";
   quantity.value = "0.125000000001";
   amount.value = "65000.12345678";

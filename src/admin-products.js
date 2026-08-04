@@ -151,7 +151,9 @@ export function mountAdminProducts({
   for (const value of ["active", "inactive"]) {
     productStatus.append(element(document, "option", { value }, i18n.t(`products.${value}`)));
   }
-  const position = element(document, "input", { name: "position", type: "number", min: "0", step: "1", required: "required" });
+  const position = element(document, "input", {
+    name: "position", type: "number", inputmode: "numeric", min: "0", step: "1", required: "required"
+  });
   const marketable = element(document, "input", { name: "marketable", type: "checkbox" });
   const metadata = element(document, "textarea", { name: "metadata", rows: "6" });
   const saveProduct = element(document, "button", { type: "submit" }, i18n.t("products.save"));

@@ -181,3 +181,87 @@ test("admin workspace mounts product creation and refreshes the editor to the ne
     transport: {}
   }), null);
 });
+
+test("orders prices third and keeps localizations after the pricing section", async () => {
+  const document = marketDocument();
+  const workspace = mountAdminWorkspace({
+    document,
+    catalog: { products: bootstrapDocument({ role: "admin" }).data },
+    session: { role: "admin" },
+    transport: {
+      async listAdminProducts() { return [product()]; },
+      async updateAdminProduct() { return product({ version: 3 }); },
+      async saveAdminProductLocalization() { return localization("en_US", 1); },
+      async createAdminProduct(payload) { return product({ id: payload.sku, status: "inactive", version: 0 }); },
+      async getAdminPriceProposal() {
+        return {
+          data: [{
+            type: "price_proposal",
+            id: "premium_3m",
+            attributes: { name: "Premium 3m", position: 1, current_amount_usdt: "12.5" }
+          }],
+          meta: { revision: 1 }
+        };
+      },
+      async listAdminPriceHistory() { return { data: [], meta: { revision: 1 } }; },
+      async applyAdminPrices() { return { status: "ok", data: [], meta: { revision: 2 } }; }
+    }
+  });
+
+  await workspace.ready;
+  const sectionIds = workspace.root.children
+    .map((child) => child.attributes?.id)
+    .filter(Boolean);
+  assert.deepEqual(sectionIds, [
+    "admin-products",
+    "admin-create-product",
+    "admin-prices",
+    "admin-localizations"
+  ]);
+  assert.equal(workspace.products.localizationRoot, workspace.root.children.at(-1));
+});
+
+test("makes product creation pending until its POST resolves", async () => {
+  const document = marketDocument();
+  let resolveCreate;
+  let products = [product()];
+  const workspace = mountAdminWorkspace({
+    document,
+    catalog: { products: bootstrapDocument({ role: "admin" }).data },
+    session: { role: "admin" },
+    transport: {
+      async listAdminProducts() { return products; },
+      async updateAdminProduct() { return product({ version: 3 }); },
+      async saveAdminProductLocalization() { return localization("en_US", 1); },
+      async createAdminProduct(payload) {
+        return new Promise((resolve) => {
+          resolveCreate = () => {
+            const created = product({ id: payload.sku, status: "inactive", version: 0 });
+            products = [...products, created];
+            resolve(created);
+          };
+        });
+      }
+    }
+  });
+  await workspace.ready;
+  const controls = workspace.createProduct.form.children.map((label) => label.children?.[1]).filter(Boolean);
+  const [sku, shortName, position, marketable, metadata, locale, fullName, buttonLabel] = controls;
+  sku.value = "premium_12m";
+  shortName.value = "Premium · 12m";
+  position.value = "3";
+  marketable.checked = true;
+  metadata.value = "{}";
+  locale.value = "uk_UA";
+  fullName.value = "Telegram Premium на 12 місяців";
+  buttonLabel.value = "Premium · 12 міс.";
+
+  const submission = workspace.createProduct.form.dispatch("submit");
+  await Promise.resolve();
+  assert.equal(workspace.createProduct.root.inert, true);
+  assert.equal(workspace.createProduct.root.attributes["aria-busy"], "true");
+  resolveCreate();
+  await submission;
+  assert.equal(workspace.createProduct.root.inert, false);
+  assert.equal(workspace.createProduct.root.attributes["aria-busy"], "false");
+});

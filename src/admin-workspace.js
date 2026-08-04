@@ -94,7 +94,14 @@ export function mountAdminWorkspace({
   root.append(title, description, grid);
   container.append(root);
   const products = productsWritable
-    ? mountAdminProducts({ document, session, transport, locale: i18n.locale, container: root })
+    ? mountAdminProducts({
+      document,
+      session,
+      transport,
+      locale: i18n.locale,
+      container: root,
+      localizationContainer: null
+    })
     : null;
   const createProduct = productsCreatable
     ? mountAdminCreateProduct({
@@ -109,6 +116,7 @@ export function mountAdminWorkspace({
   const prices = pricesWritable
     ? mountAdminPrices({ document, session, transport, locale: i18n.locale, container: root })
     : null;
+  if (products?.localizationRoot) root.append(products.localizationRoot);
   const ready = Promise.all([
     products?.ready || Promise.resolve(null),
     prices?.ready || Promise.resolve(null)

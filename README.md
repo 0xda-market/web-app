@@ -73,6 +73,8 @@ Workspace visibility derives only from the verified session supplied by the host
 
 `mountWorkspaceNavigation` controls section visibility without interpreting channel authentication. `mountAdminWorkspace` composes isolated administrator capabilities rather than creating one privileged catch-all surface.
 
+Administrator editors are ordered as Products, Add product, Prices, then Localizations. Pricing is therefore the third writable section and localization remains visibly independent from locale-neutral product state.
+
 ## Products and localizations
 
 An administrator host may supply:
@@ -105,7 +107,9 @@ An administrator host may supply:
 - `applyAdminPrices({ revision, prices })`;
 - `listAdminPriceHistory({ limit })`.
 
-`createAdminPricingController` preserves the proposal revision and submits it with one complete catalog-wide application. Every active product and currency requires a positive USDT amount before the user can confirm. `mountAdminPrices` uses a two-step review and confirmation flow, then reloads the authoritative proposal and append-only history. A concurrent application remains a server-defined `concurrency_conflict`; the browser does not retry or merge stale values.
+`createAdminPricingController` preserves the proposal revision and submits only fields changed since the proposal loaded. The changed subset is validated and appended as one atomic batch; unchanged or currently unpriced catalog rows do not block it. `mountAdminPrices` saves that batch on the first explicit submit, then reloads the authoritative proposal and append-only history. A concurrent application remains a server-defined `concurrency_conflict`; the browser does not retry or merge stale values.
+
+Every asynchronous write makes its complete owning section inert, exposes `aria-busy=true`, and keeps localized loading copy visible until the transport settles. This applies to checkout POST actions, broker listing mutations, product creation and editing, localization writes, and price application; one pending write cannot be submitted twice or mixed with another action in the same section.
 
 ## Payment-aware delivery sequence
 

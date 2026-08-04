@@ -80,6 +80,51 @@ test("requests and accepts a quote for the exact client quantity", async () => {
   assert.deepEqual(calls[1], ["accept", { quoteId: "quote-1" }]);
 });
 
+test("makes the checkout section pending while a quote POST is in flight", async () => {
+  const document = marketDocument();
+  let resolveQuote;
+  await mountMarketApp({
+    document,
+    host: {
+      locale: () => "uk_UA",
+      viewport: () => ({ width: 390, height: 844 }),
+      onViewportChanged() {},
+      selectionFeedback() {}
+    },
+    transport: {
+      async bootstrap() { return bootstrapDocument({ role: "client", count: 1 }); },
+      async quote(payload) {
+        return new Promise((resolve) => {
+          resolveQuote = () => resolve({
+            type: "quote",
+            id: "quote-1",
+            attributes: {
+              expires_at: "2026-08-03T13:00:00Z",
+              quantity: payload.quantity,
+              total_price_usdt: "1",
+              currency: "USDT"
+            }
+          });
+        });
+      },
+      async acceptQuote() {},
+      async refreshOrder() {}
+    }
+  });
+
+  document.elements.products.children[0].dispatch("click");
+  document.elements["checkout-action"].dispatch("click");
+  await Promise.resolve();
+  assert.equal(document.elements["checkout-dialog"].inert, true);
+  assert.equal(document.elements["checkout-dialog"].attributes["aria-busy"], "true");
+  assert.match(document.elements["dialog-status"].textContent, /Резервуємо доступний залишок/);
+
+  resolveQuote();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(document.elements["checkout-dialog"].inert, false);
+  assert.equal(document.elements["checkout-dialog"].attributes["aria-busy"], "false");
+});
+
 test("retains the legacy draft key contract without using browser storage", () => {
   assert.notEqual(
     brokerStorageKey({ subject: "broker-a", environment: "development" }),
@@ -199,4 +244,56 @@ test("publishes and withdraws listings with exact decimal strings", async () => 
   await card.children.at(-1).dispatch("click");
   assert.deepEqual(calls[1], ["withdraw", { listingId: "listing-2", version: 0 }]);
   assert.equal(workspace.getListings().length, 0);
+});
+
+test("makes the broker section pending while a listing POST is in flight", async () => {
+  const document = marketDocument();
+  let resolveCreate;
+  const transport = {
+    async listBrokerListings() { return []; },
+    async createBrokerListing(payload) {
+      return new Promise((resolve) => {
+        resolveCreate = () => resolve({
+          type: "broker_listing",
+          id: "listing-2",
+          attributes: {
+            sku: payload.sku,
+            quantity: payload.quantity,
+            available_quantity: payload.quantity,
+            reserved_quantity: "0",
+            sold_quantity: "0",
+            price_amount: payload.priceAmount,
+            currency: payload.currency,
+            status: "active",
+            version: 0
+          }
+        });
+      });
+    },
+    async updateBrokerListing() {},
+    async withdrawBrokerListing() {}
+  };
+  const workspace = await mountBrokerWorkspace({
+    document,
+    catalog: { products: bootstrapDocument().data },
+    session: { role: "broker", subject: "broker", environment: "development" },
+    currencies: ["USDT"],
+    transport
+  });
+  const controls = workspace.form.children.map((label) => label.children?.[1]).filter(Boolean);
+  const [product, quantity, amount, currency] = controls;
+  product.value = "product_1";
+  quantity.value = "1";
+  amount.value = "10";
+  currency.value = "USDT";
+
+  const submission = workspace.form.dispatch("submit");
+  await Promise.resolve();
+  assert.equal(workspace.root.inert, true);
+  assert.equal(workspace.root.attributes["aria-busy"], "true");
+  assert.match(workspace.status.textContent, /Publishing listing/);
+  resolveCreate();
+  await submission;
+  assert.equal(workspace.root.inert, false);
+  assert.equal(workspace.root.attributes["aria-busy"], "false");
 });

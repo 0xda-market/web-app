@@ -2,6 +2,7 @@ import { assertHost, assertTransport } from "./contracts.js";
 import * as bundledEngine from "./engine.js";
 import { createI18n, normalizeLocale } from "./i18n.js";
 import { paymentPendingMessage } from "./payment-status.js";
+import { setSectionPending } from "./pending-section.js";
 
 function immutable(value) {
   if (Array.isArray(value)) value.forEach(immutable);
@@ -186,9 +187,14 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
       : status === "quoted" ? checkout.accept()
       : ["payment_pending", "pending", "accepted"].includes(status) ? checkout.refresh() : null;
     if (!operation) return;
+    setSectionPending(elements.dialog, true);
     renderCheckout();
-    await operation;
-    renderCheckout();
+    try {
+      await operation;
+      renderCheckout();
+    } finally {
+      setSectionPending(elements.dialog, false);
+    }
   }
 
   function bind() {
@@ -249,6 +255,7 @@ export async function mountMarketApp(options) {
 
 export { createI18n, normalizeLocale } from "./i18n.js";
 export { paymentPendingMessage } from "./payment-status.js";
+export { setSectionPending } from "./pending-section.js";
 export { mountBrokerWorkspace, brokerStorageKey } from "./broker-workspace.js";
 export { mountAdminWorkspace, adminWorkspaceSummary } from "./admin-workspace.js";
 export { createAdminCatalogController, mountAdminProducts } from "./admin-products.js";

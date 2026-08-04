@@ -1,4 +1,5 @@
 import { createI18n } from "./i18n.js";
+import { setSectionPending } from "./pending-section.js";
 
 function element(document, tag, attributes = {}, text = null) {
   const node = document.createElement(tag);
@@ -80,6 +81,7 @@ export function mountAdminCreateProduct({
   const fullName = element(document, "input", { name: "full_name", required: "required", maxlength: "160" });
   const buttonLabel = element(document, "input", { name: "button_label", required: "required", maxlength: "64" });
   const save = element(document, "button", { type: "submit" }, i18n.t("products.create"));
+  setSectionPending(root, false);
 
   position.value = "0";
   marketable.checked = true;
@@ -107,6 +109,7 @@ export function mountAdminCreateProduct({
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     save.disabled = true;
+    setSectionPending(root, true);
     status.textContent = i18n.t("products.creating");
     try {
       const resource = await controller.create({
@@ -129,6 +132,7 @@ export function mountAdminCreateProduct({
     } catch (error) {
       status.textContent = error.message;
     } finally {
+      setSectionPending(root, false);
       save.disabled = false;
     }
   });

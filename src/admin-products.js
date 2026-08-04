@@ -1,4 +1,5 @@
 import { createI18n } from "./i18n.js";
+import { setSectionPending } from "./pending-section.js";
 
 function element(document, tag, attributes = {}, text = null) {
   const node = document.createElement(tag);
@@ -115,10 +116,20 @@ export function createAdminCatalogController({ transport, locale = "en_US" }) {
   };
 }
 
-export function mountAdminProducts({ document, session, transport, locale = "en_US", container = document?.body }) {
+export function mountAdminProducts({
+  document,
+  session,
+  transport,
+  locale = "en_US",
+  container = document?.body,
+  localizationContainer = container
+}) {
   if (session?.role !== "admin") return null;
   if (!document?.createElement) throw new TypeError("document is required");
   if (!container?.append) throw new TypeError("admin products container is required");
+  if (localizationContainer !== null && !localizationContainer?.append) {
+    throw new TypeError("admin localizations container is required");
+  }
 
   const i18n = createI18n(locale);
   const controller = createAdminCatalogController({ transport, locale: i18n.locale });
@@ -126,6 +137,13 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
   const heading = element(document, "h3", {}, i18n.t("products.title"));
   const description = element(document, "p", {}, i18n.t("products.description"));
   const status = element(document, "p", { className: "admin-products-status", role: "status" }, i18n.t("products.loading"));
+  const localizationRoot = element(document, "section", {
+    id: "admin-localizations",
+    className: "admin-products admin-localizations"
+  });
+  const localizationHeading = element(document, "h3", {}, i18n.t("products.localizationsTitle"));
+  const localizationDescription = element(document, "p", {}, i18n.t("products.localizationsDescription"));
+  const localizationStatus = element(document, "p", { className: "admin-products-status", role: "status" }, "");
   const productSelect = element(document, "select", { "aria-label": i18n.t("products.product") });
   const productForm = element(document, "form", { className: "admin-product-form" });
   const shortName = element(document, "input", { name: "short_name", required: "required", maxlength: "64" });
@@ -143,6 +161,8 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
   const buttonLabel = element(document, "input", { name: "button_label", required: "required", maxlength: "64" });
   const saveLocalization = element(document, "button", { type: "submit" }, i18n.t("products.saveLocalization"));
   const localizationList = element(document, "div", { className: "admin-localization-list" });
+  setSectionPending(root, false);
+  setSectionPending(localizationRoot, false);
 
   function field(label, control) {
     const wrapper = element(document, "label");
@@ -160,12 +180,12 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
     const current = controller.state().selected;
     if (!current) {
       productForm.hidden = true;
-      localizationForm.hidden = true;
+      localizationRoot.hidden = true;
       localizationList.replaceChildren();
       return;
     }
     productForm.hidden = false;
-    localizationForm.hidden = false;
+    localizationRoot.hidden = false;
     productSelect.value = current.id;
     shortName.value = current.shortName;
     productStatus.value = current.status;
@@ -198,11 +218,13 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
 
   productSelect.addEventListener("change", (event) => {
     controller.select(event.currentTarget.value);
+    localizationStatus.textContent = "";
     renderSelected();
   });
   productForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     saveProduct.disabled = true;
+    setSectionPending(root, true);
     status.textContent = i18n.t("products.saving");
     try {
       const parsedMetadata = JSON.parse(metadata.value || "{}");
@@ -221,13 +243,15 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
     } catch (error) {
       status.textContent = error.message;
     } finally {
+      setSectionPending(root, false);
       saveProduct.disabled = false;
     }
   });
   localizationForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     saveLocalization.disabled = true;
-    status.textContent = i18n.t("products.savingLocalization");
+    setSectionPending(localizationRoot, true);
+    localizationStatus.textContent = i18n.t("products.savingLocalization");
     try {
       await controller.saveLocalization({
         locale: localizationLocale.value,
@@ -235,10 +259,11 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
         buttonLabel: buttonLabel.value.trim()
       });
       renderSelected();
-      status.textContent = i18n.t("products.localizationSaved");
+      localizationStatus.textContent = i18n.t("products.localizationSaved");
     } catch (error) {
-      status.textContent = error.message;
+      localizationStatus.textContent = error.message;
     } finally {
+      setSectionPending(localizationRoot, false);
       saveLocalization.disabled = false;
     }
   });
@@ -257,13 +282,32 @@ export function mountAdminProducts({ document, session, transport, locale = "en_
     field(i18n.t("products.buttonLabel"), buttonLabel),
     saveLocalization
   );
-  root.append(heading, description, status, productSelect, productForm, localizationList, localizationForm);
+  root.append(heading, description, status, productSelect, productForm);
+  localizationRoot.append(
+    localizationHeading,
+    localizationDescription,
+    localizationStatus,
+    localizationList,
+    localizationForm
+  );
   container.append(root);
+  if (localizationContainer) localizationContainer.append(localizationRoot);
 
   const ready = reload().catch((error) => {
     status.textContent = error.message;
     throw error;
   });
 
-  return { root, status, productSelect, productForm, localizationForm, controller, reload, ready };
+  return {
+    root,
+    localizationRoot,
+    status,
+    localizationStatus,
+    productSelect,
+    productForm,
+    localizationForm,
+    controller,
+    reload,
+    ready
+  };
 }

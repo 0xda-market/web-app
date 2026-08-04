@@ -1,4 +1,5 @@
 import { createI18n } from "./i18n.js";
+import { setSectionPending } from "./pending-section.js";
 
 const LEGACY_STORAGE_PREFIX = "0xda-market.broker-offers.v2";
 
@@ -77,6 +78,7 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
   const save = element(document, "button", { type: "submit" }, i18n.t("broker.publish"));
   const status = element(document, "p", { id: "broker-listing-status", role: "status" }, i18n.t("broker.loading"));
   const list = element(document, "div", { id: "broker-listing-list" });
+  setSectionPending(root, false);
   let editingId = null;
   let listings = [];
 
@@ -109,6 +111,7 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
   }
 
   async function withdraw(listing) {
+    setSectionPending(root, true);
     status.textContent = i18n.t("broker.withdrawing");
     try {
       await transport.withdrawBrokerListing({ listingId: listing.id, version: listing.version });
@@ -118,6 +121,8 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
       status.textContent = i18n.t("broker.withdrawn");
     } catch (error) {
       status.textContent = error.message;
+    } finally {
+      setSectionPending(root, false);
     }
   }
 
@@ -174,6 +179,7 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
     }
 
     save.disabled = true;
+    setSectionPending(root, true);
     status.textContent = editingId ? i18n.t("broker.updating") : i18n.t("broker.publishing");
     try {
       let resource;
@@ -205,6 +211,7 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
     } catch (error) {
       status.textContent = error.message;
     } finally {
+      setSectionPending(root, false);
       save.disabled = false;
     }
   });

@@ -51,7 +51,7 @@ function history(revision = 4) {
   };
 }
 
-test("loads a revisioned proposal and applies the complete price set", async () => {
+test("loads a revisioned proposal and atomically applies only changed prices", async () => {
   const calls = [];
   let revision = 4;
   const transport = {
@@ -60,7 +60,7 @@ test("loads a revisioned proposal and applies the complete price set", async () 
     async applyAdminPrices(payload) {
       calls.push(payload);
       revision += payload.prices.length;
-      return { data: [], meta: { revision } };
+      return { status: "ok", data: [], meta: { revision } };
     }
   };
   const controller = createAdminPricingController({ transport, locale: "en_US" });
@@ -70,15 +70,12 @@ test("loads a revisioned proposal and applies the complete price set", async () 
 
   assert.deepEqual(calls, [{
     revision: 4,
-    prices: [
-      { sku: "premium_3m", amount_usdt: "12.75" },
-      { sku: "uah", amount_usdt: "0.024" }
-    ]
+    prices: [{ sku: "premium_3m", amount_usdt: "12.75" }]
   }]);
-  assert.equal(controller.state().revision, 6);
+  assert.equal(controller.state().revision, 5);
 });
 
-test("rejects an incomplete or invalid catalog-wide application", async () => {
+test("rejects an empty or invalid changed-price application", async () => {
   const transport = {
     async getAdminPriceProposal() { return proposal(); },
     async listAdminPriceHistory() { return history(); },
@@ -86,16 +83,21 @@ test("rejects an incomplete or invalid catalog-wide application", async () => {
   };
   const controller = createAdminPricingController({ transport });
   await controller.load();
+  assert.throws(() => controller.application(), /change at least one price/);
   controller.setPrice("uah", "");
   assert.throws(() => controller.application(), /every price must be a positive decimal/);
 });
 
 test("mounts the price workspace only for administrators", async () => {
   const document = marketDocument();
+  const calls = [];
   const transport = {
     async getAdminPriceProposal() { return proposal(); },
     async listAdminPriceHistory() { return history(); },
-    async applyAdminPrices() { return { data: [], meta: { revision: 6 } }; }
+    async applyAdminPrices(payload) {
+      calls.push(payload);
+      return { status: "ok", data: [], meta: { revision: 5 } };
+    }
   };
   assert.equal(mountAdminPrices({
     document,
@@ -112,6 +114,45 @@ test("mounts the price workspace only for administrators", async () => {
   assert.equal(mounted.rows.children.length, 2);
   assert.match(mounted.status.textContent, /revision 4/);
 
+  const firstInput = mounted.rows.children[0].children.at(-1);
+  firstInput.value = "12.75";
+  firstInput.dispatch("input");
   await mounted.form.dispatch("submit");
-  assert.match(mounted.applyButton.textContent, /Confirm 2 prices/);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].prices, [{ sku: "premium_3m", amount_usdt: "12.75" }]);
+  assert.match(mounted.status.textContent, /applied atomically/i);
+  assert.equal(mounted.root.inert, false);
+  assert.equal(mounted.root.attributes["aria-busy"], "false");
+});
+
+test("makes the complete price section pending until its POST resolves", async () => {
+  const document = marketDocument();
+  let resolveApply;
+  const transport = {
+    async getAdminPriceProposal() { return proposal(); },
+    async listAdminPriceHistory() { return history(); },
+    async applyAdminPrices() {
+      return new Promise((resolve) => { resolveApply = resolve; });
+    }
+  };
+  const mounted = mountAdminPrices({
+    document,
+    session: { role: "admin" },
+    transport
+  });
+  await mounted.ready;
+  const firstInput = mounted.rows.children[0].children.at(-1);
+  firstInput.value = "12.75";
+  firstInput.dispatch("input");
+
+  const submission = mounted.form.dispatch("submit");
+  await Promise.resolve();
+  assert.equal(mounted.root.inert, true);
+  assert.equal(mounted.root.attributes["aria-busy"], "true");
+  assert.match(mounted.status.textContent, /Applying prices/);
+
+  resolveApply({ status: "ok", data: [], meta: { revision: 5 } });
+  await submission;
+  assert.equal(mounted.root.inert, false);
+  assert.equal(mounted.root.attributes["aria-busy"], "false");
 });

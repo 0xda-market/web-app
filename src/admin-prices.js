@@ -1,4 +1,5 @@
 import { createI18n } from "./i18n.js";
+import { setSectionPending } from "./pending-section.js";
 
 function element(document, tag, attributes = {}, text = null) {
   const node = document.createElement(tag);
@@ -64,6 +65,7 @@ export function createAdminPricingController({ transport, locale = "en_US", hist
   let revision = 0;
   let generatedAt = null;
   const drafts = new Map();
+  const dirty = new Set();
 
   async function load() {
     const [proposalDocument, historyDocument] = await Promise.all([
@@ -77,6 +79,7 @@ export function createAdminPricingController({ transport, locale = "en_US", hist
     revision = Number(proposal.meta.revision);
     generatedAt = proposal.meta.generated_at || null;
     drafts.clear();
+    dirty.clear();
     for (const entry of entries) drafts.set(entry.sku, entry.currentAmount);
     return state();
   }
@@ -85,7 +88,11 @@ export function createAdminPricingController({ transport, locale = "en_US", hist
     return {
       revision,
       generatedAt,
-      entries: entries.map((entry) => ({ ...entry, amount: drafts.get(entry.sku) || "" })),
+      entries: entries.map((entry) => ({
+        ...entry,
+        amount: drafts.get(entry.sku) || "",
+        changed: dirty.has(entry.sku)
+      })),
       history: history.map((entry) => ({ ...entry }))
     };
   }
@@ -94,15 +101,21 @@ export function createAdminPricingController({ transport, locale = "en_US", hist
     load,
     setPrice(sku, amount) {
       const id = String(sku || "");
-      if (!entries.some((entry) => entry.sku === id)) throw new RangeError(`price proposal entry is unavailable: ${id}`);
-      drafts.set(id, String(amount || ""));
+      const entry = entries.find((candidate) => candidate.sku === id);
+      if (!entry) throw new RangeError(`price proposal entry is unavailable: ${id}`);
+      const value = String(amount || "");
+      drafts.set(id, value);
+      if (value === entry.currentAmount) dirty.delete(id);
+      else dirty.add(id);
       return state();
     },
     application() {
-      return entries.map((entry) => ({
+      const prices = entries.filter((entry) => dirty.has(entry.sku)).map((entry) => ({
         sku: entry.sku,
         amount_usdt: normalizedAmount(drafts.get(entry.sku))
       }));
+      if (prices.length === 0) throw new TypeError("change at least one price before saving");
+      return prices;
     },
     async apply() {
       const prices = this.application();
@@ -126,15 +139,10 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
   const status = element(document, "p", { className: "admin-prices-status", role: "status" }, i18n.t("prices.loading"));
   const form = element(document, "form", { className: "admin-price-form" });
   const rows = element(document, "div", { className: "admin-price-rows" });
-  const applyButton = element(document, "button", { type: "submit" }, i18n.t("prices.review"));
+  const applyButton = element(document, "button", { type: "submit" }, i18n.t("prices.save"));
   const historyHeading = element(document, "h4", {}, i18n.t("prices.history"));
   const historyList = element(document, "div", { className: "admin-price-history" });
-  let armed = false;
-
-  function resetConfirmation() {
-    armed = false;
-    applyButton.textContent = i18n.t("prices.review");
-  }
+  setSectionPending(root, false);
 
   function renderHistory(items) {
     historyList.replaceChildren(...items.map((entry) => {
@@ -161,7 +169,6 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
       input.value = entry.amount;
       input.addEventListener("input", (event) => {
         controller.setPrice(entry.sku, event.currentTarget.value);
-        resetConfirmation();
       });
       row.append(
         element(document, "strong", {}, entry.name),
@@ -175,28 +182,23 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
     }));
     renderHistory(state.history);
     status.textContent = i18n.t("prices.summary", { count: state.entries.length, revision: state.revision });
-    resetConfirmation();
+    applyButton.textContent = i18n.t("prices.save");
   }
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    applyButton.disabled = true;
     try {
-      const prices = controller.application();
-      if (!armed) {
-        armed = true;
-        applyButton.textContent = i18n.t("prices.confirm", { count: prices.length });
-        status.textContent = i18n.t("prices.reviewRevision", { revision: controller.state().revision });
-        return;
-      }
-      applyButton.disabled = true;
+      controller.application();
+      setSectionPending(root, true);
       status.textContent = i18n.t("prices.applying");
       await controller.apply();
       render();
       status.textContent = i18n.t("prices.applied");
     } catch (error) {
       status.textContent = error.message;
-      resetConfirmation();
     } finally {
+      setSectionPending(root, false);
       applyButton.disabled = false;
     }
   });

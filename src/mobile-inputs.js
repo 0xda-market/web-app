@@ -2,6 +2,7 @@ const TEXT_FIELD_SELECTOR = [
   'input:not([type="button"]):not([type="checkbox"]):not([type="hidden"]):not([type="radio"]):not([type="reset"]):not([type="submit"])',
   "textarea"
 ].join(", ");
+const CONFIRMATION_CONTROL_SELECTOR = "[data-mobile-input-confirm]";
 
 const mountedDocuments = new WeakMap();
 
@@ -24,6 +25,7 @@ export function mountMobileInputVisibility({
   document,
   viewport = globalThis.visualViewport,
   windowTarget = globalThis,
+  confirmationControl = document?.querySelector?.(CONFIRMATION_CONTROL_SELECTOR),
   margin = 24
 } = {}) {
   if (!document?.addEventListener) return inertController();
@@ -35,6 +37,17 @@ export function mountMobileInputVisibility({
   const requestFrame = typeof windowTarget?.requestAnimationFrame === "function"
     ? (callback) => windowTarget.requestAnimationFrame(callback)
     : (callback) => callback();
+
+  function setConfirmationVisible(visible) {
+    if (confirmationControl) confirmationControl.hidden = !visible;
+  }
+
+  function positionConfirmationControl(bounds) {
+    if (!confirmationControl?.style) return;
+    const fallbackBottom = Number(windowTarget?.innerHeight);
+    const bottom = bounds?.bottom || (Number.isFinite(fallbackBottom) && fallbackBottom > 0 ? fallbackBottom : null);
+    if (bottom) confirmationControl.style.top = `${Math.round(bottom)}px`;
+  }
 
   function ensureVisible() {
     if (!activeField || typeof activeField.getBoundingClientRect !== "function") return;
@@ -66,6 +79,7 @@ export function mountMobileInputVisibility({
     scheduled = true;
     requestFrame(() => {
       scheduled = false;
+      positionConfirmationControl(viewportBounds(viewport));
       ensureVisible();
     });
   }
@@ -73,11 +87,25 @@ export function mountMobileInputVisibility({
   function handleFocusIn(event) {
     if (!isTextField(event.target)) return;
     activeField = event.target;
+    setConfirmationVisible(true);
     scheduleVisibilityCheck();
   }
 
   function handleFocusOut(event) {
-    if (event.target === activeField) activeField = null;
+    if (event.target !== activeField) return;
+    activeField = null;
+    setConfirmationVisible(false);
+  }
+
+  function preserveFieldFocus(event) {
+    event.preventDefault?.();
+  }
+
+  function dismissActiveField() {
+    const field = activeField;
+    activeField = null;
+    setConfirmationVisible(false);
+    field?.blur?.();
   }
 
   document.addEventListener("focusin", handleFocusIn);
@@ -85,6 +113,10 @@ export function mountMobileInputVisibility({
   viewport?.addEventListener?.("resize", scheduleVisibilityCheck);
   viewport?.addEventListener?.("scroll", scheduleVisibilityCheck);
   windowTarget?.addEventListener?.("resize", scheduleVisibilityCheck);
+  confirmationControl?.addEventListener?.("pointerdown", preserveFieldFocus);
+  confirmationControl?.addEventListener?.("mousedown", preserveFieldFocus);
+  confirmationControl?.addEventListener?.("click", dismissActiveField);
+  setConfirmationVisible(false);
 
   const controller = Object.freeze({
     dispose() {
@@ -93,7 +125,11 @@ export function mountMobileInputVisibility({
       viewport?.removeEventListener?.("resize", scheduleVisibilityCheck);
       viewport?.removeEventListener?.("scroll", scheduleVisibilityCheck);
       windowTarget?.removeEventListener?.("resize", scheduleVisibilityCheck);
+      confirmationControl?.removeEventListener?.("pointerdown", preserveFieldFocus);
+      confirmationControl?.removeEventListener?.("mousedown", preserveFieldFocus);
+      confirmationControl?.removeEventListener?.("click", dismissActiveField);
       activeField = null;
+      setConfirmationVisible(false);
       mountedDocuments.delete(document);
     }
   });

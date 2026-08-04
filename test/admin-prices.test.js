@@ -115,6 +115,10 @@ test("mounts the price workspace only for administrators", async () => {
   assert.match(mounted.status.textContent, /revision 4/);
 
   const firstInput = mounted.rows.children[0].children.at(-1);
+  assert.equal(firstInput.type, "number");
+  assert.equal(firstInput.attributes.inputmode, "decimal");
+  assert.equal(firstInput.attributes.min, "0.000001");
+  assert.equal(firstInput.attributes.step, "any");
   firstInput.value = "12.75";
   firstInput.dispatch("input");
   await mounted.form.dispatch("submit");

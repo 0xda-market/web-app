@@ -74,7 +74,9 @@ export function mountAdminCreateProduct({
   const form = element(document, "form", { className: "admin-product-form" });
   const sku = element(document, "input", { name: "sku", required: "required", maxlength: "64", autocomplete: "off" });
   const shortName = element(document, "input", { name: "short_name", required: "required", maxlength: "64" });
-  const position = element(document, "input", { name: "position", type: "number", min: "0", step: "1", required: "required" });
+  const position = element(document, "input", {
+    name: "position", type: "number", inputmode: "numeric", min: "0", step: "1", required: "required"
+  });
   const marketable = element(document, "input", { name: "marketable", type: "checkbox" });
   const metadata = element(document, "textarea", { name: "metadata", rows: "5" });
   const localizationLocale = element(document, "input", { name: "locale", required: "required", placeholder: "en_US" });

@@ -53,7 +53,6 @@ export function mountAdminWorkspace({
   const i18n = createI18n(locale);
   const summary = adminWorkspaceSummary(catalog);
   const root = element(document, "section", { id: "admin-workspace", className: "admin-workspace" });
-  const header = element(document, "header", { className: "admin-workspace-header" });
   const title = element(document, "h2", {}, i18n.t("admin.title"));
   const description = element(
     document,
@@ -61,8 +60,6 @@ export function mountAdminWorkspace({
     { className: "admin-workspace-description" },
     i18n.t("admin.description")
   );
-  header.append(title, description);
-
   const grid = element(document, "div", {
     className: "admin-capability-grid admin-capability-rail",
     role: "list",
@@ -104,7 +101,7 @@ export function mountAdminWorkspace({
     grid.append(card);
   }
 
-  root.append(header, grid);
+  root.append(title, description, grid);
   container.append(root);
   const prices = pricesWritable
     ? mountAdminPrices({ document, session, transport, locale: i18n.locale, container: root })

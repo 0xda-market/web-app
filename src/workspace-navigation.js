@@ -6,6 +6,12 @@ const ROLE_SECTIONS = Object.freeze({
   admin: Object.freeze(["market", "listings", "admin"])
 });
 
+const SECTION_ICONS = Object.freeze({
+  market: "⌂",
+  listings: "≡",
+  admin: "◇"
+});
+
 function element(document, tag, attributes = {}, text = null) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(attributes)) {
@@ -15,6 +21,32 @@ function element(document, tag, attributes = {}, text = null) {
   }
   if (text !== null) node.textContent = text;
   return node;
+}
+
+function defaultWorkspaceLabel(entry, i18n) {
+  return entry.id === "admin" ? i18n.t("admin.title") : i18n.t(`workspace.${entry.id}`);
+}
+
+function workspaceTab(document, entry, i18n) {
+  const label = entry.label || defaultWorkspaceLabel(entry, i18n);
+  const button = element(document, "button", {
+    type: "button",
+    className: "workspace-tab",
+    role: "tab",
+    "data-workspace": entry.id,
+    "aria-label": label,
+    "aria-selected": "false"
+  });
+  const icon = element(document, "span", {
+    className: "workspace-tab-icon",
+    "data-workspace-icon": entry.id,
+    "aria-hidden": "true"
+  }, SECTION_ICONS[entry.id] || "·");
+  const text = element(document, "span", {
+    className: "workspace-tab-label"
+  }, label);
+  button.append(icon, text);
+  return button;
 }
 
 export function workspaceSectionsForRole(role) {
@@ -58,13 +90,7 @@ export function mountWorkspaceNavigation({
   }
 
   for (const entry of entries) {
-    const button = element(document, "button", {
-      type: "button",
-      className: "workspace-tab",
-      role: "tab",
-      "data-workspace": entry.id,
-      "aria-selected": "false"
-    }, entry.label || i18n.t(`workspace.${entry.id}`));
+    const button = workspaceTab(document, entry, i18n);
     button.addEventListener("click", () => select(entry.id));
     buttons.set(entry.id, button);
     root.append(button);

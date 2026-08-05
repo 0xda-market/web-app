@@ -60,33 +60,43 @@ export function mountAdminWorkspace({
     { className: "admin-workspace-description" },
     i18n.t("admin.description")
   );
-  const grid = element(document, "div", { className: "admin-capability-grid" });
+  const grid = element(document, "div", {
+    className: "admin-capability-grid admin-capability-rail",
+    role: "list",
+    "aria-label": i18n.t("admin.title")
+  });
   const productsWritable = supportsAdminProducts(transport);
   const productsCreatable = supportsAdminProductCreation(transport);
   const pricesWritable = supportsAdminPrices(transport);
   const capabilities = [
     [
+      "products",
       i18n.t("admin.products"),
       i18n.t("admin.productsMetric", { count: summary.products }),
       i18n.t(productsWritable ? "admin.productsReady" : "admin.productsUnavailable")
     ],
     [
+      "prices",
       i18n.t("admin.prices"),
       i18n.t("admin.pricesMetric", { priced: summary.pricedProducts, unpriced: summary.unpricedProducts }),
       i18n.t(pricesWritable ? "admin.pricesReady" : "admin.pricesUnavailable")
     ],
-    [i18n.t("admin.users"), i18n.t("admin.usersMetric"), i18n.t("admin.usersNote")],
-    [i18n.t("admin.orders"), i18n.t("admin.ordersMetric"), i18n.t("admin.ordersNote")],
-    [i18n.t("admin.listings"), i18n.t("admin.listingsMetric"), i18n.t("admin.listingsNote")],
-    [i18n.t("admin.fulfillment"), i18n.t("admin.fulfillmentMetric"), i18n.t("admin.fulfillmentNote")]
+    ["users", i18n.t("admin.users"), i18n.t("admin.usersMetric"), i18n.t("admin.usersNote")],
+    ["orders", i18n.t("admin.orders"), i18n.t("admin.ordersMetric"), i18n.t("admin.ordersNote")],
+    ["listings", i18n.t("admin.listings"), i18n.t("admin.listingsMetric"), i18n.t("admin.listingsNote")],
+    ["fulfillment", i18n.t("admin.fulfillment"), i18n.t("admin.fulfillmentMetric"), i18n.t("admin.fulfillmentNote")]
   ];
 
-  for (const [name, metric, note] of capabilities) {
-    const card = element(document, "article", { className: "admin-capability" });
+  for (const [id, name, metric, note] of capabilities) {
+    const card = element(document, "article", {
+      className: "admin-capability admin-capability-summary",
+      role: "listitem",
+      "data-admin-capability": id
+    });
     card.append(
-      element(document, "strong", {}, name),
-      element(document, "span", { className: "admin-capability-metric" }, metric),
-      element(document, "p", {}, note)
+      element(document, "span", { className: "admin-capability-name" }, name),
+      element(document, "strong", { className: "admin-capability-metric" }, metric),
+      element(document, "span", { className: "admin-capability-note" }, note)
     );
     grid.append(card);
   }

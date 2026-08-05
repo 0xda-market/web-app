@@ -13,8 +13,9 @@ test("admin overview is a compact semantic rail before writable sections", () =>
     transport: {}
   });
 
-  const [header, rail] = workspace.root.children;
-  assert.equal(header.className, "admin-workspace-header");
+  const [title, description, rail] = workspace.root.children;
+  assert.equal(title.textContent, "Адміністрування");
+  assert.equal(description.className, "admin-workspace-description");
   assert.equal(rail.attributes.role, "list");
   assert.match(rail.className, /admin-capability-rail/);
   assert.equal(rail.children.length, 6);

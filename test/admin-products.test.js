@@ -187,7 +187,7 @@ test("admin workspace mounts product creation and refreshes the editor to the ne
   }), null);
 });
 
-test("orders prices third and keeps localizations after the pricing section", async () => {
+test("orders prices first and keeps localizations after product creation", async () => {
   const document = marketDocument();
   const workspace = mountAdminWorkspace({
     document,
@@ -218,9 +218,9 @@ test("orders prices third and keeps localizations after the pricing section", as
     .map((child) => child.attributes?.id)
     .filter(Boolean);
   assert.deepEqual(sectionIds, [
+    "admin-prices",
     "admin-products",
     "admin-create-product",
-    "admin-prices",
     "admin-localizations"
   ]);
   assert.equal(workspace.products.localizationRoot, workspace.root.children.at(-1));

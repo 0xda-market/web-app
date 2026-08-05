@@ -81,7 +81,7 @@ Workspace visibility derives only from the verified session supplied by the host
 
 `mountWorkspaceNavigation` controls section visibility without interpreting channel authentication. `mountAdminWorkspace` composes isolated administrator capabilities rather than creating one privileged catch-all surface.
 
-Administrator editors are ordered as Products, Add product, Prices, then Localizations. Pricing is therefore the third writable section and localization remains visibly independent from locale-neutral product state.
+Administrator editors are ordered as Prices, Products, Add product, then Localizations. Frequent pricing review and catalog maintenance therefore stay ahead of the less common product-creation flow, while localization remains visibly independent from locale-neutral product state.
 
 ## Products and localizations
 

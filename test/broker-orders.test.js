@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mountBrokerOrders } from "../src/broker-orders.js";
+import { mountBrokerOrders, orderLifecycle } from "../src/broker-orders.js";
 import { marketDocument } from "./helpers.js";
 
 function order(overrides = {}) {
@@ -46,12 +46,55 @@ test("shows broker-owned requests and follows accept then complete states", asyn
 
   assert.equal(mounted.getOrders().length, 1);
   assert.match(mounted.root.children[0].textContent, /Замовлення клієнтів/);
-  await mounted.list.children[0].children.at(-1).dispatch("click");
+
+  const requested = mounted.list.children[0];
+  assert.equal(requested.attributes["data-order-status"], "requested");
+  assert.deepEqual(
+    requested.children[1].children.map((step) => step.attributes["data-lifecycle-state"]),
+    ["complete", "current", "upcoming", "upcoming", "upcoming"]
+  );
+  assert.equal(requested.children[2].children[0].attributes["data-order-action"], "accept");
+
+  await requested.children[2].children[0].dispatch("click");
   assert.deepEqual(calls[1], ["accept", { orderId: "order-1", version: 0 }]);
   assert.equal(mounted.getOrders()[0].status, "accepted");
-  await mounted.list.children[0].children.at(-1).dispatch("click");
+
+  const accepted = mounted.list.children[0];
+  assert.deepEqual(
+    accepted.children[1].children.map((step) => step.attributes["data-lifecycle-state"]),
+    ["complete", "complete", "complete", "current", "upcoming"]
+  );
+  await accepted.children[2].children[0].dispatch("click");
   assert.deepEqual(calls[2], ["complete", { orderId: "order-1", version: 1 }]);
   assert.equal(mounted.getOrders()[0].status, "completed");
+
+  const completed = mounted.list.children[0];
+  assert.deepEqual(
+    completed.children[1].children.map((step) => step.attributes["data-lifecycle-state"]),
+    ["complete", "complete", "complete", "complete", "complete"]
+  );
+  assert.equal(completed.children[2].children.length, 0);
+});
+
+test("keeps the lifecycle rail whole while payment is pending or has failed", () => {
+  assert.deepEqual(
+    orderLifecycle({ status: "accepted", orderStatus: "payment_pending", paymentStatus: "pending" }),
+    [
+      { step: "requested", state: "complete" },
+      { step: "accepted", state: "complete" },
+      { step: "payment", state: "current" },
+      { step: "fulfillment", state: "upcoming" },
+      { step: "completion", state: "upcoming" }
+    ]
+  );
+  assert.deepEqual(
+    orderLifecycle({ status: "accepted", orderStatus: "failed", paymentStatus: "failed" }).map((entry) => entry.state),
+    ["complete", "complete", "failed", "upcoming", "failed"]
+  );
+  assert.deepEqual(
+    orderLifecycle({}).map((entry) => entry.state),
+    ["complete", "current", "upcoming", "upcoming", "upcoming"]
+  );
 });
 
 test("does not mount broker orders for a client role", async () => {

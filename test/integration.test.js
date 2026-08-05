@@ -180,9 +180,27 @@ test("mounts broker workspace and loads durable finite inventory from transport"
   assert.equal(workspace.getListings()[0].id, "listing-1");
   assert.equal(workspace.getListings()[0].availableQuantity, "1.5");
   assert.deepEqual(calls, [["list"]]);
-  assert.match(workspace.list.children[0].children[2].textContent, /Доступно 1.5/);
-  assert.match(workspace.list.children[0].children[2].textContent, /Зарезервовано 0.5/);
-  assert.match(workspace.list.children[0].children[2].textContent, /Продано 0.5/);
+
+  const [card] = workspace.list.children;
+  assert.equal(card.attributes["data-listing-status"], "active");
+  assert.equal(card.children[0].children[1].textContent, "Активне");
+  assert.equal(card.children[1].children[1].textContent, "12.25 USDT");
+  const inventory = card.children[2];
+  assert.equal(inventory.attributes["data-inventory-owner"], "server");
+  assert.match(inventory.attributes["aria-label"], /Доступно 1.5/);
+  assert.match(inventory.attributes["aria-label"], /Зарезервовано 0.5/);
+  assert.match(inventory.attributes["aria-label"], /Продано 0.5/);
+  assert.deepEqual(
+    inventory.children.map((balance) => [
+      balance.attributes["data-balance"],
+      balance.children[1].textContent
+    ]),
+    [["total", "2.5"], ["available", "1.5"], ["reserved", "0.5"], ["sold", "0.5"]]
+  );
+  assert.deepEqual(
+    card.children[3].children.map((action) => action.attributes["data-listing-action"]),
+    ["edit", "withdraw"]
+  );
   assert.equal(document.main.children.at(-1), workspace.root);
   assert.equal(await mountBrokerWorkspace({
     document,
@@ -247,7 +265,7 @@ test("publishes and withdraws listings with exact decimal strings", async () => 
   assert.equal(workspace.getListings().length, 1);
   assert.equal(workspace.getListings()[0].availableQuantity, "0.125000000001");
   const card = workspace.list.children[0];
-  await card.children.at(-1).dispatch("click");
+  await card.children.at(-1).children.at(-1).dispatch("click");
   assert.deepEqual(calls[1], ["withdraw", { listingId: "listing-2", version: 0 }]);
   assert.equal(workspace.getListings().length, 0);
 });

@@ -137,9 +137,13 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
   const heading = element(document, "h3", {}, i18n.t("prices.title"));
   const description = element(document, "p", {}, i18n.t("prices.description"));
   const status = element(document, "p", { className: "admin-prices-status", role: "status" }, i18n.t("prices.loading"));
-  const form = element(document, "form", { className: "admin-price-form" });
+  const form = element(document, "form", { className: "admin-price-form", "data-changed-prices": "0" });
   const rows = element(document, "div", { className: "admin-price-rows" });
-  const applyButton = element(document, "button", { type: "submit" }, i18n.t("prices.save"));
+  const applyButton = element(document, "button", {
+    type: "submit",
+    className: "admin-price-apply"
+  }, i18n.t("prices.save"));
+  applyButton.disabled = true;
   const historyHeading = element(document, "h4", {}, i18n.t("prices.history"));
   const historyList = element(document, "div", { className: "admin-price-history" });
   setSectionPending(root, false);
@@ -156,35 +160,76 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
     }));
   }
 
+  function amount(kind, label, value) {
+    const node = element(document, "span", {
+      className: `admin-price-amount admin-price-${kind}`,
+      "data-price-amount": kind
+    });
+    node.append(
+      element(document, "span", { className: "admin-price-amount-label" }, label),
+      element(document, "span", { className: "admin-price-amount-value" }, value || "—")
+    );
+    return node;
+  }
+
+  // The changed state is authored per row so the adapter can accent a single
+  // row without re-reading the whole section, and so the operator sees the
+  // edit register while typing rather than only after saving.
+  function markChanged(row, indicator, changed) {
+    row.setAttribute("data-price-state", changed ? "changed" : "unchanged");
+    indicator.setAttribute("data-price-state", changed ? "changed" : "unchanged");
+    indicator.textContent = i18n.t(changed ? "prices.changed" : "prices.unchanged");
+  }
+
+  function renderApplyAction(state) {
+    const changed = state.entries.filter((entry) => entry.changed).length;
+    applyButton.textContent = changed === 0
+      ? i18n.t("prices.save")
+      : i18n.t("prices.saveChanged", { count: changed });
+    applyButton.disabled = changed === 0;
+    form.setAttribute("data-changed-prices", String(changed));
+  }
+
+  function priceRow(entry) {
+    const row = element(document, "label", { className: "admin-price-row", "data-sku": entry.sku });
+    const input = element(document, "input", {
+      className: "admin-price-input",
+      type: "number",
+      inputmode: "decimal",
+      min: "0.000001",
+      step: "any",
+      "data-sku": entry.sku,
+      "aria-label": i18n.t("prices.inputLabel", { name: entry.name })
+    });
+    const indicator = element(document, "span", { className: "admin-price-change" });
+    const values = element(document, "span", { className: "admin-price-amounts" });
+    values.append(
+      amount("current", i18n.t("prices.current"), entry.currentAmount),
+      amount("previous", i18n.t("prices.previous"), entry.previousAmount)
+    );
+    input.value = entry.amount;
+    input.addEventListener("input", (event) => {
+      const next = controller.setPrice(entry.sku, event.currentTarget.value);
+      markChanged(row, indicator, Boolean(next.entries.find((item) => item.sku === entry.sku)?.changed));
+      renderApplyAction(next);
+    });
+    markChanged(row, indicator, entry.changed);
+    row.append(
+      element(document, "span", { className: "admin-price-name" }, entry.name),
+      values,
+      input,
+      indicator
+    );
+    return row;
+  }
+
   function render() {
     const state = controller.state();
-    rows.replaceChildren(...state.entries.map((entry) => {
-      const row = element(document, "label", { className: "admin-price-row" });
-      const input = element(document, "input", {
-        type: "number",
-        inputmode: "decimal",
-        min: "0.000001",
-        step: "any",
-        "data-sku": entry.sku,
-        "aria-label": i18n.t("prices.inputLabel", { name: entry.name })
-      });
-      input.value = entry.amount;
-      input.addEventListener("input", (event) => {
-        controller.setPrice(entry.sku, event.currentTarget.value);
-      });
-      row.append(
-        element(document, "strong", {}, entry.name),
-        element(document, "span", {}, i18n.t("prices.currentPrevious", {
-          current: entry.currentAmount || "—",
-          previous: entry.previousAmount || "—"
-        })),
-        input
-      );
-      return row;
-    }));
+    rows.replaceChildren(...state.entries.map(priceRow));
     renderHistory(state.history);
+    root.setAttribute("data-price-revision", String(state.revision));
     status.textContent = i18n.t("prices.summary", { count: state.entries.length, revision: state.revision });
-    applyButton.textContent = i18n.t("prices.save");
+    renderApplyAction(state);
   }
 
   form.addEventListener("submit", async (event) => {
@@ -201,7 +246,7 @@ export function mountAdminPrices({ document, session, transport, locale = "en_US
       status.textContent = error.message;
     } finally {
       setSectionPending(root, false);
-      applyButton.disabled = false;
+      renderApplyAction(controller.state());
     }
   });
 

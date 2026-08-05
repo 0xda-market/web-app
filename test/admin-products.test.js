@@ -226,6 +226,49 @@ test("orders prices first and keeps localizations after product creation", async
   assert.equal(workspace.products.localizationRoot, workspace.root.children.at(-1));
 });
 
+test("leads the product editor with a compact selector and the selected-product summary", async () => {
+  const document = marketDocument();
+  const workspace = mountAdminWorkspace({
+    document,
+    catalog: { products: bootstrapDocument({ role: "admin" }).data },
+    session: { role: "admin" },
+    transport: {
+      async listAdminProducts() { return [product({ localizations: [localization("en_US"), localization("uk_UA")] })]; },
+      async updateAdminProduct() { return product({ version: 3 }); },
+      async saveAdminProductLocalization() { return localization("en_US", 1); }
+    }
+  });
+
+  await workspace.ready;
+  const [, , , selector, summary, form] = workspace.products.root.children;
+  assert.equal(selector.attributes["data-product-step"], "selector");
+  assert.equal(selector.children[0], workspace.products.productSelect);
+  assert.equal(summary, workspace.products.productSummary);
+  assert.equal(summary.attributes["data-product-sku"], "premium_3m");
+  assert.equal(summary.attributes["data-product-status"], "active");
+  assert.equal(summary.children[0].textContent, "Premium · 3m");
+  assert.deepEqual(
+    summary.children[1].children.map((field) => [
+      field.attributes["data-product-field"],
+      field.children[1].textContent
+    ]),
+    [
+      ["sku", "premium_3m"],
+      ["status", "active"],
+      ["position", "1"],
+      ["marketable", "Yes"],
+      ["localizations", "en_US · uk_UA"]
+    ]
+  );
+  assert.equal(form, workspace.products.productForm);
+  assert.equal(form.attributes["data-product-scope"], "locale-neutral");
+  assert.equal(workspace.products.localizationRoot.attributes["data-product-scope"], "localized");
+  assert.deepEqual(
+    workspace.products.localizationRoot.children[3].children.map((chip) => chip.attributes["aria-pressed"]),
+    ["true", "false"]
+  );
+});
+
 test("makes product creation pending until its POST resolves", async () => {
   const document = marketDocument();
   let resolveCreate;

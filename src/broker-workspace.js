@@ -126,40 +126,91 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
     }
   }
 
+  function statusLabel(value) {
+    const key = `broker.status.${value}`;
+    const label = i18n.t(key);
+    return label === key ? value : label;
+  }
+
+  function balance(name, label, value) {
+    const group = element(document, "div", { className: "broker-listing-balance", "data-balance": name });
+    group.append(
+      element(document, "dt", { className: "broker-listing-balance-label" }, label),
+      element(document, "dd", { className: "broker-listing-balance-value" }, value || "0")
+    );
+    return group;
+  }
+
+  function listingCard(listing) {
+    const productEntry = products.find((entry) => entry.id === listing.sku);
+    const card = element(document, "article", {
+      className: "broker-listing",
+      "data-listing": listing.id,
+      "data-listing-status": listing.status
+    });
+    const header = element(document, "header", { className: "broker-listing-header" });
+    header.append(
+      element(document, "strong", { className: "broker-listing-product" }, productEntry?.attributes?.name || listing.sku),
+      element(document, "span", {
+        className: "broker-listing-status",
+        "aria-label": i18n.t("broker.status")
+      }, statusLabel(listing.status))
+    );
+    const price = element(document, "p", { className: "broker-listing-price" });
+    price.append(
+      element(document, "span", { className: "broker-listing-price-label" }, i18n.t("broker.supplyPrice")),
+      element(document, "span", { className: "broker-listing-price-amount" }, `${listing.priceAmount} ${listing.currency}`)
+    );
+    // The four balances are one server-owned equation. They are grouped as a
+    // single description list and are never summed or corrected in the browser.
+    const inventory = element(document, "dl", {
+      className: "broker-listing-inventory",
+      "data-inventory-owner": "server",
+      "aria-label": i18n.t("broker.inventory", {
+        available: listing.availableQuantity,
+        reserved: listing.reservedQuantity,
+        sold: listing.soldQuantity
+      })
+    });
+    inventory.append(
+      balance("total", i18n.t("broker.total"), listing.quantity),
+      balance("available", i18n.t("broker.available"), listing.availableQuantity),
+      balance("reserved", i18n.t("broker.reserved"), listing.reservedQuantity),
+      balance("sold", i18n.t("broker.sold"), listing.soldQuantity)
+    );
+    const actions = element(document, "div", { className: "broker-listing-actions" });
+    const edit = element(document, "button", {
+      type: "button",
+      className: "broker-listing-action",
+      "data-listing-action": "edit"
+    }, i18n.t("broker.edit"));
+    edit.addEventListener("click", () => {
+      editingId = listing.id;
+      product.value = listing.sku;
+      product.disabled = true;
+      quantity.value = listing.quantity;
+      amount.value = listing.priceAmount;
+      currency.value = listing.currency;
+      save.textContent = i18n.t("broker.update");
+      status.textContent = i18n.t("broker.editing");
+    });
+    const remove = element(document, "button", {
+      type: "button",
+      className: "broker-listing-action",
+      "data-listing-action": "withdraw"
+    }, i18n.t("broker.withdraw"));
+    remove.addEventListener("click", () => withdraw(listing));
+    actions.append(edit, remove);
+    card.append(header, price, inventory, actions);
+    return card;
+  }
+
   function render() {
-    list.replaceChildren();
     if (!listings.length) {
-      list.append(element(document, "p", {}, i18n.t("broker.empty")));
+      list.replaceChildren(element(document, "p", { className: "broker-listing-empty" }, i18n.t("broker.empty")));
       return;
     }
-    for (const listing of listings) {
-      const productEntry = products.find((entry) => entry.id === listing.sku);
-      const card = element(document, "article", { className: "broker-listing" });
-      card.append(
-        element(document, "strong", {}, productEntry?.attributes?.name || listing.sku),
-        element(document, "span", {}, `${listing.quantity} × ${listing.priceAmount} ${listing.currency}`),
-        element(document, "small", { className: "broker-listing-inventory" }, i18n.t("broker.inventory", {
-          available: listing.availableQuantity,
-          reserved: listing.reservedQuantity,
-          sold: listing.soldQuantity
-        }))
-      );
-      const edit = element(document, "button", { type: "button" }, i18n.t("broker.edit"));
-      edit.addEventListener("click", () => {
-        editingId = listing.id;
-        product.value = listing.sku;
-        product.disabled = true;
-        quantity.value = listing.quantity;
-        amount.value = listing.priceAmount;
-        currency.value = listing.currency;
-        save.textContent = i18n.t("broker.update");
-        status.textContent = i18n.t("broker.editing");
-      });
-      const remove = element(document, "button", { type: "button" }, i18n.t("broker.withdraw"));
-      remove.addEventListener("click", () => withdraw(listing));
-      card.append(edit, remove);
-      list.append(card);
-    }
+    list.replaceChildren(...listings.map(listingCard));
   }
 
   form.append(

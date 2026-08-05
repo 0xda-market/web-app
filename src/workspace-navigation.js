@@ -23,8 +23,12 @@ function element(document, tag, attributes = {}, text = null) {
   return node;
 }
 
+function defaultWorkspaceLabel(entry, i18n) {
+  return entry.id === "admin" ? i18n.t("admin.title") : i18n.t(`workspace.${entry.id}`);
+}
+
 function workspaceTab(document, entry, i18n) {
-  const label = entry.label || i18n.t(`workspace.${entry.id}`);
+  const label = entry.label || defaultWorkspaceLabel(entry, i18n);
   const button = element(document, "button", {
     type: "button",
     className: "workspace-tab",

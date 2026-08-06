@@ -157,6 +157,14 @@ test("mounts broker workspace and loads durable finite inventory from transport"
           price_amount: "12.25",
           currency: "USDT",
           status: "active",
+          routing: {
+            execution_status: "executable",
+            status: "best",
+            estimated_order_share: "0.7",
+            eligible_supply_count: 3,
+            sale_price_usdt: "15",
+            maximum_ask: { amount: "14.55", currency: "USDT" }
+          },
           version: 2,
           updated_at: "2026-08-01T12:00:00Z"
         }
@@ -179,13 +187,21 @@ test("mounts broker workspace and loads durable finite inventory from transport"
   assert.ok(workspace);
   assert.equal(workspace.getListings()[0].id, "listing-1");
   assert.equal(workspace.getListings()[0].availableQuantity, "1.5");
+  assert.equal(workspace.getListings()[0].routing.status, "best");
   assert.deepEqual(calls, [["list"]]);
 
   const [card] = workspace.list.children;
   assert.equal(card.attributes["data-listing-status"], "active");
   assert.equal(card.children[0].children[1].textContent, "Активне");
   assert.equal(card.children[1].children[1].textContent, "12.25 USDT");
-  const inventory = card.children[2];
+  const routing = card.children[2];
+  assert.equal(routing.attributes["data-routing-status"], "best");
+  assert.equal(routing.attributes["data-execution-status"], "executable");
+  assert.equal(routing.children[0].children[0].textContent, "Найкраща пропозиція");
+  assert.match(routing.children[0].children[1].textContent, /70/);
+  assert.equal(routing.children[1].children[0].children[1].textContent, "15 USDT");
+  assert.equal(routing.children[1].children[1].children[1].textContent, "14.55 USDT");
+  const inventory = card.children[3];
   assert.equal(inventory.attributes["data-inventory-owner"], "server");
   assert.match(inventory.attributes["aria-label"], /Доступно 1.5/);
   assert.match(inventory.attributes["aria-label"], /Зарезервовано 0.5/);
@@ -198,7 +214,7 @@ test("mounts broker workspace and loads durable finite inventory from transport"
     [["total", "2.5"], ["available", "1.5"], ["reserved", "0.5"], ["sold", "0.5"]]
   );
   assert.deepEqual(
-    card.children[3].children.map((action) => action.attributes["data-listing-action"]),
+    card.children[4].children.map((action) => action.attributes["data-listing-action"]),
     ["edit", "withdraw"]
   );
   assert.equal(document.main.children.at(-1), workspace.root);

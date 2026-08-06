@@ -62,10 +62,11 @@ Product state and localized copy carry independent versions, so they are marked 
 
 1. `.broker-listing-header` — `.broker-listing-product` and the localized `.broker-listing-status`;
 2. `.broker-listing-price` — `.broker-listing-price-label` and `.broker-listing-price-amount`;
-3. `.broker-listing-inventory[data-inventory-owner="server"]` — a description list of `.broker-listing-balance[data-balance]` entries for `total`, `available`, `reserved` and `sold`, each with a label and value;
-4. `.broker-listing-actions` — `.broker-listing-action[data-listing-action]` for `edit` and `withdraw`.
+3. optional `.broker-listing-routing[data-routing-status][data-execution-status]` — server-owned routing status, estimated order share, administrator sale price and maximum executable ask; it is absent when an older core response has no routing contract;
+4. `.broker-listing-inventory[data-inventory-owner="server"]` — a description list of `.broker-listing-balance[data-balance]` entries for `total`, `available`, `reserved` and `sold`, each with a label and value;
+5. `.broker-listing-actions` — `.broker-listing-action[data-listing-action]` for `edit` and `withdraw`.
 
-The four balances are one server-owned equation and are grouped for that reason. The browser never sums, derives or corrects them; the group carries the same figures as an `aria-label` so the equation is announced once. `data-listing-action="withdraw"` identifies the destructive action.
+The four balances are one server-owned equation and are grouped for that reason. The browser never sums, derives or corrects them; the group carries the same figures as an `aria-label` so the equation is announced once. Routing economics are also server-owned: the browser only formats the reported decimal share as a percentage. `data-listing-action="withdraw"` identifies the destructive action.
 
 ## Orders and fulfillment
 

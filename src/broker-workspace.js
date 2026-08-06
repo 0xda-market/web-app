@@ -38,6 +38,17 @@ function positiveDecimal(value, scale) {
 
 function normalizeListing(resource) {
   const attributes = resource?.attributes || {};
+  const routing = attributes.routing && typeof attributes.routing === "object"
+    ? Object.freeze({
+        executionStatus: String(attributes.routing.execution_status || ""),
+        status: String(attributes.routing.status || ""),
+        estimatedOrderShare: String(attributes.routing.estimated_order_share ?? ""),
+        eligibleSupplyCount: Number(attributes.routing.eligible_supply_count || 0),
+        salePriceUsdt: String(attributes.routing.sale_price_usdt || ""),
+        maximumAskAmount: String(attributes.routing.maximum_ask?.amount || ""),
+        maximumAskCurrency: String(attributes.routing.maximum_ask?.currency || "")
+      })
+    : null;
   const quantity = String(attributes.quantity || "");
   return Object.freeze({
     id: String(resource?.id || ""),
@@ -49,6 +60,7 @@ function normalizeListing(resource) {
     priceAmount: String(attributes.price_amount || ""),
     currency: String(attributes.currency || ""),
     status: String(attributes.status || ""),
+    routing,
     version: Number(attributes.version),
     updatedAt: String(attributes.updated_at || "")
   });
@@ -141,6 +153,55 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
     return group;
   }
 
+  function percentage(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < 0) return "";
+    return new Intl.NumberFormat(locale.replace("_", "-"), {
+      style: "percent",
+      maximumFractionDigits: 1
+    }).format(number);
+  }
+
+  function routingCard(routing) {
+    if (!routing) return null;
+    const panel = element(document, "section", {
+      className: "broker-listing-routing",
+      "data-routing-status": routing.status,
+      "data-execution-status": routing.executionStatus
+    });
+    const header = element(document, "header", { className: "broker-listing-routing-header" });
+    header.append(
+      element(document, "strong", { className: "broker-listing-routing-status" }, i18n.t(`broker.routing.${routing.status}`))
+    );
+    const share = percentage(routing.estimatedOrderShare);
+    if (share) {
+      header.append(element(document, "span", { className: "broker-listing-routing-share" }, i18n.t("broker.routing.share", { share })));
+    }
+
+    const metrics = element(document, "dl", { className: "broker-listing-routing-metrics" });
+    if (routing.salePriceUsdt) {
+      metrics.append(balance("sale-price", i18n.t("broker.routing.salePrice"), `${routing.salePriceUsdt} USDT`));
+    }
+    if (routing.maximumAskAmount && routing.maximumAskCurrency) {
+      metrics.append(balance(
+        "maximum-ask",
+        i18n.t("broker.routing.maximumAsk"),
+        `${routing.maximumAskAmount} ${routing.maximumAskCurrency}`
+      ));
+    }
+
+    const noteKey = routing.executionStatus === "executable" || routing.executionStatus === "superseded"
+      ? `broker.routing.note.${routing.status}`
+      : routing.maximumAskAmount
+        ? "broker.routing.note.not_executable"
+        : "broker.routing.note.not_executable_no_limit";
+    const note = element(document, "p", { className: "broker-listing-routing-note" }, i18n.t(noteKey));
+    panel.append(header);
+    if (metrics.children.length) panel.append(metrics);
+    panel.append(note);
+    return panel;
+  }
+
   function listingCard(listing) {
     const productEntry = products.find((entry) => entry.id === listing.sku);
     const card = element(document, "article", {
@@ -201,7 +262,10 @@ export async function mountBrokerWorkspace({ document, catalog, session, currenc
     }, i18n.t("broker.withdraw"));
     remove.addEventListener("click", () => withdraw(listing));
     actions.append(edit, remove);
-    card.append(header, price, inventory, actions);
+    const routing = routingCard(listing.routing);
+    card.append(header, price);
+    if (routing) card.append(routing);
+    card.append(inventory, actions);
     return card;
   }
 

@@ -139,13 +139,27 @@ export function mountAdminProducts({
   const status = element(document, "p", { className: "admin-products-status", role: "status" }, i18n.t("products.loading"));
   const localizationRoot = element(document, "section", {
     id: "admin-localizations",
-    className: "admin-products admin-localizations"
+    className: "admin-products admin-localizations",
+    "data-product-step": "localizations",
+    "data-product-scope": "localized"
   });
   const localizationHeading = element(document, "h3", {}, i18n.t("products.localizationsTitle"));
   const localizationDescription = element(document, "p", {}, i18n.t("products.localizationsDescription"));
   const localizationStatus = element(document, "p", { className: "admin-products-status", role: "status" }, "");
+  const selector = element(document, "div", {
+    className: "admin-product-selector",
+    "data-product-step": "selector"
+  });
   const productSelect = element(document, "select", { "aria-label": i18n.t("products.product") });
-  const productForm = element(document, "form", { className: "admin-product-form" });
+  const productSummary = element(document, "article", {
+    className: "admin-product-summary",
+    "data-product-step": "summary"
+  });
+  const productForm = element(document, "form", {
+    className: "admin-product-form",
+    "data-product-step": "fields",
+    "data-product-scope": "locale-neutral"
+  });
   const shortName = element(document, "input", { name: "short_name", required: "required", maxlength: "64" });
   const productStatus = element(document, "select", { name: "status" });
   for (const value of ["active", "inactive"]) {
@@ -172,33 +186,84 @@ export function mountAdminProducts({
     return wrapper;
   }
 
+  function summaryField(name, label, value) {
+    const group = element(document, "div", {
+      className: "admin-product-summary-field",
+      "data-product-field": name
+    });
+    group.append(
+      element(document, "dt", { className: "admin-product-summary-label" }, label),
+      element(document, "dd", { className: "admin-product-summary-value" }, value)
+    );
+    return group;
+  }
+
+  // The selected product is the working context of this section: its
+  // locale-neutral identity is summarized before any editable field, and the
+  // localized copy stays in its own section with its own version.
+  function renderSummary(current) {
+    productSummary.setAttribute("data-product-sku", current.id);
+    productSummary.setAttribute("data-product-status", current.status);
+    const fields = element(document, "dl", { className: "admin-product-summary-fields" });
+    fields.append(
+      summaryField("sku", i18n.t("products.sku"), current.id),
+      summaryField("status", i18n.t("products.status"), i18n.t(`products.${current.status}`)),
+      summaryField("position", i18n.t("products.position"), String(current.position)),
+      summaryField("marketable", i18n.t("products.marketable"), i18n.t(current.marketable ? "products.yes" : "products.no")),
+      summaryField(
+        "localizations",
+        i18n.t("products.localizationsTitle"),
+        current.localizations.map((entry) => entry.locale).join(" · ") || "—"
+      )
+    );
+    productSummary.replaceChildren(
+      element(document, "strong", { className: "admin-product-summary-name" }, current.shortName),
+      fields
+    );
+  }
+
+  let localizationChips = [];
+
   function fillLocalization(localization = null) {
     localizationLocale.value = localization?.locale || "";
     fullName.value = localization?.fullName || "";
     buttonLabel.value = localization?.buttonLabel || "";
+    for (const [locale, chip] of localizationChips) {
+      chip.setAttribute("aria-pressed", String(locale === (localization?.locale || "")));
+    }
   }
 
   function renderSelected() {
     const current = controller.state().selected;
     if (!current) {
+      productSummary.hidden = true;
+      productSummary.replaceChildren();
       productForm.hidden = true;
       localizationRoot.hidden = true;
       localizationList.replaceChildren();
       return;
     }
+    productSummary.hidden = false;
     productForm.hidden = false;
     localizationRoot.hidden = false;
+    renderSummary(current);
     productSelect.value = current.id;
     shortName.value = current.shortName;
     productStatus.value = current.status;
     position.value = String(current.position);
     marketable.checked = current.marketable;
     metadata.value = JSON.stringify(current.metadata, null, 2);
-    localizationList.replaceChildren(...current.localizations.map((localization) => {
-      const button = element(document, "button", { type: "button", "data-locale": localization.locale }, localization.locale);
+    localizationChips = current.localizations.map((localization) => {
+      const button = element(document, "button", {
+        type: "button",
+        className: "admin-localization-chip",
+        "data-locale": localization.locale,
+        "aria-pressed": "false"
+      }, localization.locale);
       button.addEventListener("click", () => fillLocalization(localization));
-      return button;
-    }));
+      return [localization.locale, button];
+    });
+    localizationList.replaceChildren(...localizationChips.map(([, button]) => button));
     fillLocalization(current.localizations.find((entry) => entry.locale === i18n.locale) || current.localizations[0]);
   }
 
@@ -284,7 +349,8 @@ export function mountAdminProducts({
     field(i18n.t("products.buttonLabel"), buttonLabel),
     saveLocalization
   );
-  root.append(heading, description, status, productSelect, productForm);
+  selector.append(productSelect);
+  root.append(heading, description, status, selector, productSummary, productForm);
   localizationRoot.append(
     localizationHeading,
     localizationDescription,
@@ -306,6 +372,7 @@ export function mountAdminProducts({
     status,
     localizationStatus,
     productSelect,
+    productSummary,
     productForm,
     localizationForm,
     controller,

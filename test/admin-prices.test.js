@@ -114,13 +114,35 @@ test("mounts the price workspace only for administrators", async () => {
   assert.equal(mounted.rows.children.length, 2);
   assert.match(mounted.status.textContent, /revision 4/);
 
-  const firstInput = mounted.rows.children[0].children.at(-1);
+  const [firstRow] = mounted.rows.children;
+  const [name, amounts, firstInput, indicator] = firstRow.children;
+  assert.equal(name.className, "admin-price-name");
+  assert.equal(amounts.children[0].attributes["data-price-amount"], "current");
+  assert.equal(amounts.children[0].children[1].textContent, "12.5");
+  assert.equal(amounts.children[1].attributes["data-price-amount"], "previous");
+  assert.equal(amounts.children[1].children[1].textContent, "12.1");
+  assert.equal(firstRow.attributes["data-price-state"], "unchanged");
+  assert.equal(indicator.textContent, "Unchanged");
+  assert.equal(mounted.applyButton.disabled, true);
   assert.equal(firstInput.type, "number");
   assert.equal(firstInput.attributes.inputmode, "decimal");
   assert.equal(firstInput.attributes.min, "0.000001");
   assert.equal(firstInput.attributes.step, "any");
   firstInput.value = "12.75";
   firstInput.dispatch("input");
+  assert.equal(firstRow.attributes["data-price-state"], "changed");
+  assert.equal(indicator.textContent, "Changed");
+  assert.equal(mounted.form.attributes["data-changed-prices"], "1");
+  assert.equal(mounted.applyButton.disabled, false);
+  assert.match(mounted.applyButton.textContent, /\(1\)/);
+
+  firstInput.value = "12.5";
+  firstInput.dispatch("input");
+  assert.equal(firstRow.attributes["data-price-state"], "unchanged");
+  assert.equal(mounted.applyButton.disabled, true);
+  firstInput.value = "12.75";
+  firstInput.dispatch("input");
+
   await mounted.form.dispatch("submit");
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].prices, [{ sku: "premium_3m", amount_usdt: "12.75" }]);
@@ -145,7 +167,7 @@ test("makes the complete price section pending until its POST resolves", async (
     transport
   });
   await mounted.ready;
-  const firstInput = mounted.rows.children[0].children.at(-1);
+  const firstInput = mounted.rows.children[0].children[2];
   firstInput.value = "12.75";
   firstInput.dispatch("input");
 

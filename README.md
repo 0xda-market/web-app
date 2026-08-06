@@ -60,6 +60,7 @@ The shared WebApp owns all reusable interface copy. It currently ships complete 
 - market loading, search, categories, pagination and quantity-aware checkout;
 - payment-pending checkout state and authoritative payment terms;
 - broker listings and inventory balances;
+- allocated broker orders and their lifecycle steps;
 - role navigation;
 - administration overview;
 - product creation, editing and localization;
@@ -106,6 +107,22 @@ Broker listing transport remains:
 - `withdrawBrokerListing({ listingId, version })`.
 
 The workspace treats `quantity` as total committed inventory and renders the backend-owned `available_quantity`, `reserved_quantity` and `sold_quantity` balances. It does not derive or mutate those balances locally. Existing hosts that have not yet adopted the extended response remain readable with `available = quantity` and zero reserved/sold balances.
+
+Each listing is one operational card: product and status, supply price, the four balances grouped as the single server-owned equation they are, then the edit and withdraw actions.
+
+## Allocated broker orders
+
+A broker or administrator host may supply:
+
+- `listBrokerOrders()`;
+- `acceptBrokerOrder({ orderId, version })`;
+- `completeBrokerOrder({ orderId, version })`.
+
+`mountBrokerOrders` presents each allocated order as a lifecycle — requested, accepted, payment, fulfillment, completion — rather than a flat list of buttons. `orderLifecycle(order)` derives those step states from the reported order, order status and payment status; it never advances an order. An action is rendered only where the server contract permits the next transition, so payment confirmation, which belongs to a trusted backend or operator adapter, is shown as the awaited step instead of a disabled control.
+
+## Section markup contract
+
+`webapp-core` owns section structure, field order and row and card composition; hosts own material, layout and motion. [`docs/fluid-markup-contract.md`](docs/fluid-markup-contract.md) is the contract a host may style against: class names, `data-*` state and element order for workspace navigation, the administration rail, price rows, the product editor flow, listing inventory cards and the order lifecycle rail. It changes transport operations, role authorization, write ownership, pending-state behavior and server authority in no way.
 
 ## Price proposals, application and history
 

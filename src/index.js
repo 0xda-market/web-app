@@ -260,6 +260,7 @@ export { paymentPendingMessage } from "./payment-status.js";
 export { setSectionPending } from "./pending-section.js";
 export { mountMobileInputVisibility } from "./mobile-inputs.js";
 export { mountBrokerWorkspace, brokerStorageKey } from "./broker-workspace.js";
+export { mountBrokerOrders, orderLifecycle } from "./broker-orders.js";
 export { mountAdminWorkspace, adminWorkspaceSummary } from "./admin-workspace.js";
 export { createAdminCatalogController, mountAdminProducts } from "./admin-products.js";
 export { createAdminProductController, mountAdminCreateProduct } from "./admin-create-product.js";

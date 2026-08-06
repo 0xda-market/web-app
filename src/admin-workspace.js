@@ -68,36 +68,54 @@ export function mountAdminWorkspace({
   const productsWritable = supportsAdminProducts(transport);
   const productsCreatable = supportsAdminProductCreation(transport);
   const pricesWritable = supportsAdminPrices(transport);
+  // The rail orients, it does not delay work: capabilities follow the same
+  // operational order as the writable sections below, and a mounted capability
+  // links straight into its own section.
   const capabilities = [
-    [
-      "products",
-      i18n.t("admin.products"),
-      i18n.t("admin.productsMetric", { count: summary.products }),
-      i18n.t(productsWritable ? "admin.productsReady" : "admin.productsUnavailable")
-    ],
-    [
-      "prices",
-      i18n.t("admin.prices"),
-      i18n.t("admin.pricesMetric", { priced: summary.pricedProducts, unpriced: summary.unpricedProducts }),
-      i18n.t(pricesWritable ? "admin.pricesReady" : "admin.pricesUnavailable")
-    ],
-    ["users", i18n.t("admin.users"), i18n.t("admin.usersMetric"), i18n.t("admin.usersNote")],
-    ["orders", i18n.t("admin.orders"), i18n.t("admin.ordersMetric"), i18n.t("admin.ordersNote")],
-    ["listings", i18n.t("admin.listings"), i18n.t("admin.listingsMetric"), i18n.t("admin.listingsNote")],
-    ["fulfillment", i18n.t("admin.fulfillment"), i18n.t("admin.fulfillmentMetric"), i18n.t("admin.fulfillmentNote")]
+    {
+      id: "prices",
+      name: i18n.t("admin.prices"),
+      metric: i18n.t("admin.pricesMetric", { priced: summary.pricedProducts, unpriced: summary.unpricedProducts }),
+      note: i18n.t(pricesWritable ? "admin.pricesReady" : "admin.pricesUnavailable"),
+      section: pricesWritable ? "admin-prices" : null
+    },
+    {
+      id: "products",
+      name: i18n.t("admin.products"),
+      metric: i18n.t("admin.productsMetric", { count: summary.products }),
+      note: i18n.t(productsWritable ? "admin.productsReady" : "admin.productsUnavailable"),
+      section: productsWritable ? "admin-products" : null
+    },
+    { id: "users", name: i18n.t("admin.users"), metric: i18n.t("admin.usersMetric"), note: i18n.t("admin.usersNote") },
+    { id: "orders", name: i18n.t("admin.orders"), metric: i18n.t("admin.ordersMetric"), note: i18n.t("admin.ordersNote") },
+    { id: "listings", name: i18n.t("admin.listings"), metric: i18n.t("admin.listingsMetric"), note: i18n.t("admin.listingsNote") },
+    {
+      id: "fulfillment",
+      name: i18n.t("admin.fulfillment"),
+      metric: i18n.t("admin.fulfillmentMetric"),
+      note: i18n.t("admin.fulfillmentNote")
+    }
   ];
 
-  for (const [id, name, metric, note] of capabilities) {
+  for (const { id, name, metric, note, section = null } of capabilities) {
     const card = element(document, "article", {
       className: "admin-capability admin-capability-summary",
       role: "listitem",
-      "data-admin-capability": id
+      "data-admin-capability": id,
+      "data-admin-capability-state": section ? "available" : "planned"
     });
     card.append(
       element(document, "span", { className: "admin-capability-name" }, name),
       element(document, "strong", { className: "admin-capability-metric" }, metric),
       element(document, "span", { className: "admin-capability-note" }, note)
     );
+    if (section) {
+      card.append(element(document, "a", {
+        className: "admin-capability-link",
+        href: `#${section}`,
+        "data-admin-capability-link": id
+      }, i18n.t("admin.open", { name })));
+    }
     grid.append(card);
   }
 

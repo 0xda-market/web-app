@@ -84,6 +84,18 @@ export function pageSizeForViewport({ width, height }) {
   return safeWidth >= 900 ? WIDE_LANDSCAPE_PAGE_SIZE : LANDSCAPE_PAGE_SIZE;
 }
 
+export function purchasePolicy(product) {
+  const purchase = product?.attributes?.metadata?.purchase ?? {};
+  const recipient = purchase.recipient ?? null;
+  return immutable({
+    single: purchase.quantity_mode === "single",
+    recipient: recipient ? {
+      provider: String(recipient.provider || ""),
+      modes: Array.isArray(recipient.modes) ? recipient.modes.map(String) : ["self"]
+    } : null
+  });
+}
+
 export class CatalogStore {
   #snapshot;
   #query = "";
@@ -186,21 +198,24 @@ export class CheckoutController {
 
   reset(product = null) {
     this.#operationVersion += 1;
-    this.#state = immutable(product ? { status: "idle", product, quantity: "1" } : { status: "idle" });
+    this.#state = immutable(product ? { status: "idle", product, quantity: "1", recipient: { mode: "self" } } : { status: "idle" });
     return this.#state;
   }
 
-  async quote(product, quantity = "1") {
+  async quote(product, quantity = "1", recipient = { mode: "self" }) {
     assert(product?.id, "a product is required before quoting");
-    const normalizedQuantity = String(quantity || "").trim();
+    const policy = purchasePolicy(product);
+    const normalizedQuantity = policy.single ? "1" : String(quantity || "").trim();
     assert(/^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/.test(normalizedQuantity) && /[1-9]/.test(normalizedQuantity),
       "quantity must be a positive decimal with at most 12 fractional digits");
+    if (policy.single) assert(normalizedQuantity === "1", "this product can only be purchased one at a time");
+    const normalizedRecipient = normalizeRecipient(recipient, policy);
     const operation = ++this.#operationVersion;
-    this.#state = immutable({ status: "quoting", product, quantity: normalizedQuantity });
+    this.#state = immutable({ status: "quoting", product, quantity: normalizedQuantity, recipient: normalizedRecipient });
     try {
-      const quote = await this.#gateway.quote(product.id, normalizedQuantity);
+      const quote = await this.#gateway.quote(product.id, normalizedQuantity, normalizedRecipient);
       if (operation === this.#operationVersion) {
-        this.#state = immutable({ status: "quoted", product, quantity: normalizedQuantity, quote });
+        this.#state = immutable({ status: "quoted", product, quantity: normalizedQuantity, recipient: normalizedRecipient, quote });
       }
     } catch (error) {
       if (operation === this.#operationVersion) {
@@ -208,6 +223,7 @@ export class CheckoutController {
           status: "failed",
           product,
           quantity: normalizedQuantity,
+          recipient: normalizedRecipient,
           error: String(error.message ?? error)
         });
       }
@@ -218,22 +234,16 @@ export class CheckoutController {
   async accept() {
     assert(this.#state.status === "quoted", "a quote must be loaded before acceptance");
     const operation = ++this.#operationVersion;
-    const { product, quantity, quote } = this.#state;
-    this.#state = immutable({ status: "accepting", product, quantity, quote });
+    const { product, quantity, recipient, quote } = this.#state;
+    this.#state = immutable({ status: "accepting", product, quantity, recipient, quote });
     try {
       const order = await this.#gateway.accept(quote.id);
       if (operation === this.#operationVersion) {
-        this.#state = immutable({ status: order.attributes.status, product, quantity, quote, order });
+        this.#state = immutable({ status: order.attributes.status, product, quantity, recipient, quote, order });
       }
     } catch (error) {
       if (operation === this.#operationVersion) {
-        this.#state = immutable({
-          status: "failed",
-          product,
-          quantity,
-          quote,
-          error: String(error.message ?? error)
-        });
+        this.#state = immutable({ status: "failed", product, quantity, recipient, quote, error: String(error.message ?? error) });
       }
     }
     return this.#state;
@@ -242,27 +252,30 @@ export class CheckoutController {
   async refresh() {
     assert(this.#state.order?.id, "an order must exist before refresh");
     const operation = ++this.#operationVersion;
-    const { product, quantity, quote, order } = this.#state;
-    this.#state = immutable({ status: "refreshing", product, quantity, quote, order });
+    const { product, quantity, recipient, quote, order } = this.#state;
+    this.#state = immutable({ status: "refreshing", product, quantity, recipient, quote, order });
     try {
       const refreshed = await this.#gateway.refresh(order.id);
       if (operation === this.#operationVersion) {
-        this.#state = immutable({ status: refreshed.attributes.status, product, quantity, quote, order: refreshed });
+        this.#state = immutable({ status: refreshed.attributes.status, product, quantity, recipient, quote, order: refreshed });
       }
     } catch (error) {
       if (operation === this.#operationVersion) {
-        this.#state = immutable({
-          status: "failed",
-          product,
-          quantity,
-          quote,
-          order,
-          error: String(error.message ?? error)
-        });
+        this.#state = immutable({ status: "failed", product, quantity, recipient, quote, order, error: String(error.message ?? error) });
       }
     }
     return this.#state;
   }
+}
+
+function normalizeRecipient(recipient, policy) {
+  if (!policy.recipient) return null;
+  const mode = String(recipient?.mode || "self");
+  assert(policy.recipient.modes.includes(mode), "recipient mode is not supported");
+  if (mode === "self") return immutable({ mode: "self" });
+  const username = String(recipient?.username || "").trim().replace(/^@/, "");
+  assert(/^[A-Za-z0-9_]{1,64}$/.test(username), "recipient username is invalid");
+  return immutable({ mode: "username", username });
 }
 
 export function formatPrice(product) {

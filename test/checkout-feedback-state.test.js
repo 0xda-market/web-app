@@ -28,18 +28,14 @@ class FakeObserver {
 }
 
 function dialog() {
-  const attributes = new Set();
   return {
     dataset: {},
     open: true,
-    hasAttribute(name) {
-      return attributes.has(name);
-    },
-    setAttribute(name) {
-      attributes.add(name);
+    setAttribute(name, value) {
+      if (name === "data-loading") this.dataset.loading = String(value);
     },
     removeAttribute(name) {
-      attributes.delete(name);
+      if (name === "data-loading") delete this.dataset.loading;
     }
   };
 }
@@ -48,19 +44,46 @@ test("checkout feedback has exactly idle, loading and error states", () => {
   assert.deepEqual(Object.values(CHECKOUT_FEEDBACK_STATES), ["idle", "loading", "error"]);
 });
 
-test("data-loading drives loading and returns to idle", () => {
+test("data-loading value drives loading and returns to idle", () => {
   const target = dialog();
   const feedback = createCheckoutFeedbackState({ dialog: target, Observer: FakeObserver });
 
   assert.equal(feedback.state(), "idle");
   assert.equal(target.dataset.checkoutFeedback, "idle");
 
-  target.setAttribute("data-loading");
+  target.setAttribute("data-loading", "true");
   FakeObserver.instance.trigger();
   assert.equal(feedback.state(), "loading");
 
-  target.removeAttribute("data-loading");
+  target.setAttribute("data-loading", "false");
   FakeObserver.instance.trigger();
+  assert.equal(feedback.state(), "idle");
+});
+
+test("error survives pending cleanup and remains transient", () => {
+  const target = dialog();
+  let callback;
+  const feedback = createCheckoutFeedbackState({
+    dialog: target,
+    Observer: FakeObserver,
+    schedule(fn) {
+      callback = fn;
+      return 7;
+    }
+  });
+
+  target.setAttribute("data-loading", "true");
+  FakeObserver.instance.trigger();
+  assert.equal(feedback.state(), "loading");
+
+  feedback.error();
+  assert.equal(feedback.state(), "error");
+
+  target.setAttribute("data-loading", "false");
+  FakeObserver.instance.trigger();
+  assert.equal(feedback.state(), "error");
+
+  callback();
   assert.equal(feedback.state(), "idle");
 });
 

@@ -1,6 +1,7 @@
 import { assertHost, assertTransport } from "./contracts.js";
 import * as bundledEngine from "./engine.js";
 import { createI18n, normalizeLocale } from "./i18n.js";
+import { checkoutRecipientCopy } from "./checkout-recipient-i18n.js";
 import { mountMobileInputVisibility } from "./mobile-inputs.js";
 import { paymentPendingMessage } from "./payment-status.js";
 import { setSectionPending } from "./pending-section.js";
@@ -46,6 +47,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
   mountMobileInputVisibility({ document });
 
   const i18n = createI18n(host.locale());
+  const recipientCopy = checkoutRecipientCopy(i18n.locale);
   let store;
   let selectedProduct;
   let bootstrapContext;
@@ -82,13 +84,62 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     input.setAttribute("aria-label", i18n.t("checkout.quantity"));
     label.append(caption, input);
     elements.dialog.append(label);
+    input.__field = label;
     return input;
   }
 
+  function checkoutRecipientControls() {
+    const field = document.createElement("div");
+    field.className = "checkout-recipient-field";
+    field.hidden = true;
+
+    const label = document.createElement("label");
+    const caption = document.createElement("span");
+    caption.textContent = recipientCopy.recipient;
+    const mode = document.createElement("select");
+    mode.id = "checkout-recipient-mode";
+    mode.setAttribute("aria-label", recipientCopy.recipient);
+    const self = document.createElement("option");
+    self.value = "self";
+    self.textContent = recipientCopy.self;
+    const username = document.createElement("option");
+    username.value = "username";
+    username.textContent = recipientCopy.usernameMode;
+    mode.append(self, username);
+    label.append(caption, mode);
+
+    const usernameLabel = document.createElement("label");
+    usernameLabel.hidden = true;
+    const usernameCaption = document.createElement("span");
+    usernameCaption.textContent = recipientCopy.username;
+    const usernameInput = document.createElement("input");
+    usernameInput.id = "checkout-recipient-username";
+    usernameInput.name = "recipient_username";
+    usernameInput.type = "text";
+    usernameInput.inputMode = "text";
+    usernameInput.autocomplete = "off";
+    usernameInput.placeholder = "@username";
+    usernameInput.setAttribute("aria-label", recipientCopy.username);
+    usernameLabel.append(usernameCaption, usernameInput);
+
+    mode.addEventListener("change", () => {
+      const requiresUsername = mode.value === "username";
+      usernameLabel.hidden = !requiresUsername;
+      usernameInput.disabled = !requiresUsername;
+      usernameInput.required = requiresUsername;
+      if (!requiresUsername) usernameInput.value = "";
+    });
+
+    field.append(label, usernameLabel);
+    elements.dialog.append(field);
+    return { field, mode, usernameLabel, usernameInput };
+  }
+
   elements.quantity = checkoutQuantityControl();
+  elements.recipient = checkoutRecipientControls();
 
   const checkout = new engine.CheckoutController({
-    quote: (sku, quantity) => transport.quote({ sku, quantity, locale: i18n.locale }),
+    quote: (sku, quantity, recipient) => transport.quote({ sku, quantity, recipient, locale: i18n.locale }),
     accept: (quoteId) => transport.acceptQuote({ quoteId }),
     refresh: (orderId) => transport.refreshOrder({ orderId })
   });
@@ -167,13 +218,23 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
       }), i18n.t("checkout.confirm"), false]
       : (rows[state.status] || rows.idle);
     [elements.dialogStatus.textContent, elements.action.textContent, elements.action.disabled] = row;
-    elements.quantity.disabled = !["idle", "failed", "succeeded"].includes(state.status);
+    const editable = ["idle", "failed", "succeeded"].includes(state.status);
+    elements.quantity.disabled = !editable || engine.purchasePolicy(selectedProduct).single;
+    elements.recipient.mode.disabled = !editable;
+    elements.recipient.usernameInput.disabled = !editable || elements.recipient.mode.value !== "username";
   }
 
   function openCheckout(product) {
     selectedProduct = product;
     checkout.reset(product);
+    const policy = engine.purchasePolicy(product);
     elements.quantity.value = "1";
+    elements.quantity.__field.hidden = policy.single;
+    elements.recipient.field.hidden = !policy.recipient;
+    elements.recipient.mode.value = "self";
+    elements.recipient.usernameLabel.hidden = true;
+    elements.recipient.usernameInput.value = "";
+    elements.recipient.usernameInput.disabled = true;
     elements.dialogCategory.textContent = i18n.category(product.category.id, product.category.label);
     elements.dialogName.textContent = product.attributes.name;
     elements.dialogPrice.textContent = engine.formatPrice(product) || i18n.t("catalog.unavailable");
@@ -182,10 +243,16 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     host.selectionFeedback();
   }
 
+  function selectedRecipient() {
+    if (!engine.purchasePolicy(selectedProduct).recipient) return null;
+    if (elements.recipient.mode.value === "self") return { mode: "self" };
+    return { mode: "username", username: elements.recipient.usernameInput.value };
+  }
+
   async function performCheckout() {
     const status = checkout.state.status;
     const operation = ["idle", "failed", "succeeded"].includes(status)
-      ? checkout.quote(selectedProduct, elements.quantity.value)
+      ? checkout.quote(selectedProduct, elements.quantity.value, selectedRecipient())
       : status === "quoted" ? checkout.accept()
       : ["payment_pending", "pending", "accepted"].includes(status) ? checkout.refresh() : null;
     if (!operation) return;
@@ -256,6 +323,7 @@ export async function mountMarketApp(options) {
 }
 
 export { createI18n, normalizeLocale } from "./i18n.js";
+export { checkoutRecipientCopy } from "./checkout-recipient-i18n.js";
 export { paymentPendingMessage } from "./payment-status.js";
 export { setSectionPending } from "./pending-section.js";
 export { mountMobileInputVisibility } from "./mobile-inputs.js";

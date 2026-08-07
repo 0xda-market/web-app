@@ -1,6 +1,7 @@
 import { assertHost, assertTransport } from "./contracts.js";
 import * as bundledEngine from "./engine.js";
 import { createI18n, normalizeLocale } from "./i18n.js";
+import { checkoutRecipientCopy } from "./checkout-recipient-i18n.js";
 import { mountMobileInputVisibility } from "./mobile-inputs.js";
 import { paymentPendingMessage } from "./payment-status.js";
 import { setSectionPending } from "./pending-section.js";
@@ -46,6 +47,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
   mountMobileInputVisibility({ document });
 
   const i18n = createI18n(host.locale());
+  const recipientCopy = checkoutRecipientCopy(i18n.locale);
   let store;
   let selectedProduct;
   let bootstrapContext;
@@ -93,23 +95,23 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
 
     const label = document.createElement("label");
     const caption = document.createElement("span");
-    caption.textContent = i18n.t("checkout.recipient");
+    caption.textContent = recipientCopy.recipient;
     const mode = document.createElement("select");
     mode.id = "checkout-recipient-mode";
-    mode.setAttribute("aria-label", i18n.t("checkout.recipient"));
+    mode.setAttribute("aria-label", recipientCopy.recipient);
     const self = document.createElement("option");
     self.value = "self";
-    self.textContent = i18n.t("checkout.recipient.self");
+    self.textContent = recipientCopy.self;
     const username = document.createElement("option");
     username.value = "username";
-    username.textContent = i18n.t("checkout.recipient.username");
+    username.textContent = recipientCopy.usernameMode;
     mode.append(self, username);
     label.append(caption, mode);
 
     const usernameLabel = document.createElement("label");
     usernameLabel.hidden = true;
     const usernameCaption = document.createElement("span");
-    usernameCaption.textContent = i18n.t("checkout.username");
+    usernameCaption.textContent = recipientCopy.username;
     const usernameInput = document.createElement("input");
     usernameInput.id = "checkout-recipient-username";
     usernameInput.name = "recipient_username";
@@ -117,7 +119,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     usernameInput.inputMode = "text";
     usernameInput.autocomplete = "off";
     usernameInput.placeholder = "@username";
-    usernameInput.setAttribute("aria-label", i18n.t("checkout.username"));
+    usernameInput.setAttribute("aria-label", recipientCopy.username);
     usernameLabel.append(usernameCaption, usernameInput);
 
     mode.addEventListener("change", () => {
@@ -321,6 +323,7 @@ export async function mountMarketApp(options) {
 }
 
 export { createI18n, normalizeLocale } from "./i18n.js";
+export { checkoutRecipientCopy } from "./checkout-recipient-i18n.js";
 export { paymentPendingMessage } from "./payment-status.js";
 export { setSectionPending } from "./pending-section.js";
 export { mountMobileInputVisibility } from "./mobile-inputs.js";

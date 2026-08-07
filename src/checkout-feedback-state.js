@@ -47,7 +47,7 @@ export function createCheckoutFeedbackState({
   }
 
   const observer = new Observer(() => {
-    if (dialog.hasAttribute("data-loading")) {
+    if (dialog.dataset.loading === "true") {
       transition(STATES.LOADING);
     } else if (state === STATES.LOADING) {
       transition(STATES.IDLE);

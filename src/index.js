@@ -82,13 +82,62 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     input.setAttribute("aria-label", i18n.t("checkout.quantity"));
     label.append(caption, input);
     elements.dialog.append(label);
+    input.__field = label;
     return input;
   }
 
+  function checkoutRecipientControls() {
+    const field = document.createElement("div");
+    field.className = "checkout-recipient-field";
+    field.hidden = true;
+
+    const label = document.createElement("label");
+    const caption = document.createElement("span");
+    caption.textContent = i18n.t("checkout.recipient");
+    const mode = document.createElement("select");
+    mode.id = "checkout-recipient-mode";
+    mode.setAttribute("aria-label", i18n.t("checkout.recipient"));
+    const self = document.createElement("option");
+    self.value = "self";
+    self.textContent = i18n.t("checkout.recipient.self");
+    const username = document.createElement("option");
+    username.value = "username";
+    username.textContent = i18n.t("checkout.recipient.username");
+    mode.append(self, username);
+    label.append(caption, mode);
+
+    const usernameLabel = document.createElement("label");
+    usernameLabel.hidden = true;
+    const usernameCaption = document.createElement("span");
+    usernameCaption.textContent = i18n.t("checkout.username");
+    const usernameInput = document.createElement("input");
+    usernameInput.id = "checkout-recipient-username";
+    usernameInput.name = "recipient_username";
+    usernameInput.type = "text";
+    usernameInput.inputMode = "text";
+    usernameInput.autocomplete = "off";
+    usernameInput.placeholder = "@username";
+    usernameInput.setAttribute("aria-label", i18n.t("checkout.username"));
+    usernameLabel.append(usernameCaption, usernameInput);
+
+    mode.addEventListener("change", () => {
+      const requiresUsername = mode.value === "username";
+      usernameLabel.hidden = !requiresUsername;
+      usernameInput.disabled = !requiresUsername;
+      usernameInput.required = requiresUsername;
+      if (!requiresUsername) usernameInput.value = "";
+    });
+
+    field.append(label, usernameLabel);
+    elements.dialog.append(field);
+    return { field, mode, usernameLabel, usernameInput };
+  }
+
   elements.quantity = checkoutQuantityControl();
+  elements.recipient = checkoutRecipientControls();
 
   const checkout = new engine.CheckoutController({
-    quote: (sku, quantity) => transport.quote({ sku, quantity, locale: i18n.locale }),
+    quote: (sku, quantity, recipient) => transport.quote({ sku, quantity, recipient, locale: i18n.locale }),
     accept: (quoteId) => transport.acceptQuote({ quoteId }),
     refresh: (orderId) => transport.refreshOrder({ orderId })
   });
@@ -167,13 +216,23 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
       }), i18n.t("checkout.confirm"), false]
       : (rows[state.status] || rows.idle);
     [elements.dialogStatus.textContent, elements.action.textContent, elements.action.disabled] = row;
-    elements.quantity.disabled = !["idle", "failed", "succeeded"].includes(state.status);
+    const editable = ["idle", "failed", "succeeded"].includes(state.status);
+    elements.quantity.disabled = !editable || engine.purchasePolicy(selectedProduct).single;
+    elements.recipient.mode.disabled = !editable;
+    elements.recipient.usernameInput.disabled = !editable || elements.recipient.mode.value !== "username";
   }
 
   function openCheckout(product) {
     selectedProduct = product;
     checkout.reset(product);
+    const policy = engine.purchasePolicy(product);
     elements.quantity.value = "1";
+    elements.quantity.__field.hidden = policy.single;
+    elements.recipient.field.hidden = !policy.recipient;
+    elements.recipient.mode.value = "self";
+    elements.recipient.usernameLabel.hidden = true;
+    elements.recipient.usernameInput.value = "";
+    elements.recipient.usernameInput.disabled = true;
     elements.dialogCategory.textContent = i18n.category(product.category.id, product.category.label);
     elements.dialogName.textContent = product.attributes.name;
     elements.dialogPrice.textContent = engine.formatPrice(product) || i18n.t("catalog.unavailable");
@@ -182,10 +241,16 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     host.selectionFeedback();
   }
 
+  function selectedRecipient() {
+    if (!engine.purchasePolicy(selectedProduct).recipient) return null;
+    if (elements.recipient.mode.value === "self") return { mode: "self" };
+    return { mode: "username", username: elements.recipient.usernameInput.value };
+  }
+
   async function performCheckout() {
     const status = checkout.state.status;
     const operation = ["idle", "failed", "succeeded"].includes(status)
-      ? checkout.quote(selectedProduct, elements.quantity.value)
+      ? checkout.quote(selectedProduct, elements.quantity.value, selectedRecipient())
       : status === "quoted" ? checkout.accept()
       : ["payment_pending", "pending", "accepted"].includes(status) ? checkout.refresh() : null;
     if (!operation) return;

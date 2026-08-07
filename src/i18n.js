@@ -1,3 +1,5 @@
+import { ES, EXTRA_CATEGORY_LABELS, EUROPEAN_LOCALE_SKELETONS, PT_BR, RU } from "./i18n-locales.js";
+
 const CATEGORY_LABELS = Object.freeze({
   en_US: Object.freeze({
     telegram_premium: "Telegram Premium",
@@ -12,7 +14,8 @@ const CATEGORY_LABELS = Object.freeze({
     crypto_asset: "Криптоактиви",
     crypto: "Криптоактиви",
     digital: "Цифрові товари"
-  })
+  }),
+  ...EXTRA_CATEGORY_LABELS
 });
 
 const EN = Object.freeze({
@@ -363,16 +366,50 @@ const UK = Object.freeze({
   "prices.applied": "Ціни застосовано атомарно."
 });
 
-const BUNDLES = Object.freeze({ en_US: EN, uk_UA: UK });
+const BUNDLES = Object.freeze({
+  en_US: EN,
+  uk_UA: UK,
+  ru_RU: RU,
+  es_ES: ES,
+  pt_BR: PT_BR
+});
+
+const FULL_LOCALES = Object.freeze(new Set(Object.keys(BUNDLES)));
+const SKELETON_LOCALES = Object.freeze(new Set(Object.keys(EUROPEAN_LOCALE_SKELETONS)));
 
 export function normalizeLocale(value) {
-  const locale = String(value || "").trim().replaceAll("-", "_").toLowerCase();
-  return locale === "uk" || locale.startsWith("uk_") ? "uk_UA" : "en_US";
+  const raw = String(value || "").trim().replaceAll("-", "_");
+  const [language = "", region = ""] = raw.split("_");
+  const lang = language.toLowerCase();
+  const territory = region.toUpperCase();
+
+  if (lang === "uk") return "uk_UA";
+  if (lang === "ru") return "ru_RU";
+  if (lang === "es") return "es_ES";
+  if (lang === "pt") return territory === "PT" ? "pt_BR" : "pt_BR";
+  if (lang === "en") return "en_US";
+  if (lang === "de") return territory === "CH" ? "de_CH" : "de_DE";
+  if (lang === "fr") return territory === "CH" ? "fr_CH" : "fr_FR";
+  if (lang === "it") return territory === "CH" ? "it_CH" : "it_IT";
+  if (lang === "pl") return "pl_PL";
+  if (lang === "cs") return "cs_CZ";
+  if (lang === "hu") return "hu_HU";
+  return "en_US";
+}
+
+export function localeSupport(locale) {
+  const resolvedLocale = normalizeLocale(locale);
+  return Object.freeze({
+    locale: resolvedLocale,
+    level: FULL_LOCALES.has(resolvedLocale) ? "full" : SKELETON_LOCALES.has(resolvedLocale) ? "skeleton" : "fallback",
+    fallback: resolvedLocale === "en_US" ? null : "en_US",
+    currency: EUROPEAN_LOCALE_SKELETONS[resolvedLocale]?.currency || null
+  });
 }
 
 export function createI18n(locale = "en_US") {
   const resolvedLocale = normalizeLocale(locale);
-  const bundle = BUNDLES[resolvedLocale];
+  const bundle = BUNDLES[resolvedLocale] || EN;
   return Object.freeze({
     locale: resolvedLocale,
     t(key, parameters = {}) {
@@ -382,7 +419,8 @@ export function createI18n(locale = "en_US") {
     },
     category(id, fallback = null) {
       const key = String(id || "");
-      return CATEGORY_LABELS[resolvedLocale][key] || CATEGORY_LABELS.en_US[key] || fallback || key;
+      const labels = CATEGORY_LABELS[resolvedLocale] || CATEGORY_LABELS.en_US;
+      return labels[key] || CATEGORY_LABELS.en_US[key] || fallback || key;
     }
   });
 }

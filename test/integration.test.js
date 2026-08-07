@@ -29,14 +29,11 @@ test("mounts a complete transport document with catalog, locale, session and cur
   assert.deepEqual(app.context().currencies, ["USDT", "UAH"]);
   assert.equal(document.elements.products.children.length, 2);
   assert.equal(document.elements.status.textContent, "2 товари · 1/1");
-  const quantityField = document.elements["checkout-dialog"].children.at(-1);
-  assert.equal(quantityField.className, "checkout-quantity-field");
-  assert.equal(quantityField.children[1].value, "1");
-  assert.equal(quantityField.children[1].type, "number");
-  assert.equal(quantityField.children[1].inputMode, "decimal");
+  const recipientField = document.elements["checkout-dialog"].children.at(-1);
+  assert.equal(recipientField.className, "checkout-recipient-field");
 });
 
-test("requests and accepts a quote for the exact client quantity", async () => {
+test("requests and accepts a single-unit quote with the recipient contract", async () => {
   const document = marketDocument();
   const calls = [];
   await mountMarketApp({
@@ -71,12 +68,11 @@ test("requests and accepts a quote for the exact client quantity", async () => {
   });
 
   document.elements.products.children[0].dispatch("click");
-  const quantity = document.elements["checkout-dialog"].children.at(-1).children[1];
-  quantity.value = "3";
   await document.elements["checkout-action"].dispatch("click");
-  assert.deepEqual(calls[0], ["quote", { sku: "product_1", quantity: "3", locale: "uk_UA" }]);
-  assert.equal(quantity.disabled, true);
-  assert.match(document.elements["dialog-status"].textContent, /3 од\. · 3 USDT/);
+  assert.deepEqual(calls[0], ["quote", {
+    sku: "product_1", quantity: "1", recipient: null, locale: "uk_UA"
+  }]);
+  assert.match(document.elements["dialog-status"].textContent, /1 од\. · 3 USDT/);
 
   await document.elements["checkout-action"].dispatch("click");
   assert.deepEqual(calls[1], ["accept", { quoteId: "quote-1" }]);

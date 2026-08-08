@@ -30,6 +30,7 @@ export function marketDocument() {
     "dialog-price", "dialog-status", "home", "next", "previous", "products", "search", "snapshot", "status"
   ];
   const elements = Object.fromEntries(ids.map((id) => [id, new FakeElement(id === "category" ? "select" : "div")]));
+  elements["checkout-action"].before = (...nodes) => elements["checkout-dialog"].append(...nodes);
   const main = new FakeElement("main");
   const body = new FakeElement("body");
   return {

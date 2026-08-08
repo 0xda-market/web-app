@@ -44,8 +44,18 @@ test("purchase policy exposes server-defined recipient modes", () => {
   });
 });
 
-test("recipient copy is complete in English Ukrainian and Russian", () => {
-  assert.equal(checkoutRecipientCopy("en_US").self, "For me");
-  assert.equal(checkoutRecipientCopy("uk_UA").self, "Собі");
-  assert.equal(checkoutRecipientCopy("ru_RU").self, "Себе");
+test("recipient copy stays compact in English Ukrainian and Russian", () => {
+  assert.deepEqual(checkoutRecipientCopy("en_US"), {
+    recipient: "Recipient",
+    self: "For me",
+    other: "Someone else",
+    choose: "Choose in Telegram",
+    change: "Change",
+    manual: "Enter @username",
+    selected: "Selected recipient"
+  });
+  assert.equal(checkoutRecipientCopy("uk_UA").other, "Іншому");
+  assert.equal(checkoutRecipientCopy("uk_UA").choose, "Обрати в Telegram");
+  assert.equal(checkoutRecipientCopy("ru_RU").other, "Другому");
+  assert.equal(checkoutRecipientCopy("ru_RU").choose, "Выбрать в Telegram");
 });

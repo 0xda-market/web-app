@@ -13,6 +13,7 @@ export class FakeElement {
   }
 
   append(...nodes) { this.children.push(...nodes); }
+  before(...nodes) { this.beforeNodes = [...(this.beforeNodes || []), ...nodes]; }
   add(node) { this.append(node); }
   replaceChildren(...nodes) { this.children = [...nodes]; }
   setAttribute(key, value) { this.attributes[key] = String(value); }

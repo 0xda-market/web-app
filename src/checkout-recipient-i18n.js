@@ -1,7 +1,31 @@
 const COPY = Object.freeze({
-  en: Object.freeze({ recipient: "Recipient", self: "For me", usernameMode: "Username", username: "Telegram username" }),
-  uk: Object.freeze({ recipient: "Одержувач", self: "Собі", usernameMode: "За username", username: "Username у Telegram" }),
-  ru: Object.freeze({ recipient: "Получатель", self: "Себе", usernameMode: "По username", username: "Username в Telegram" })
+  en: Object.freeze({
+    recipient: "Recipient",
+    self: "For me",
+    other: "Someone else",
+    choose: "Choose in Telegram",
+    change: "Change",
+    manual: "Enter @username",
+    selected: "Selected recipient"
+  }),
+  uk: Object.freeze({
+    recipient: "Одержувач",
+    self: "Собі",
+    other: "Іншому",
+    choose: "Обрати в Telegram",
+    change: "Змінити",
+    manual: "Ввести @username",
+    selected: "Обраний одержувач"
+  }),
+  ru: Object.freeze({
+    recipient: "Получатель",
+    self: "Себе",
+    other: "Другому",
+    choose: "Выбрать в Telegram",
+    change: "Изменить",
+    manual: "Ввести @username",
+    selected: "Выбранный получатель"
+  })
 });
 
 export function checkoutRecipientCopy(locale) {

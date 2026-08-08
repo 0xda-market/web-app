@@ -83,7 +83,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     input.value = "1";
     input.setAttribute("aria-label", i18n.t("checkout.quantity"));
     label.append(caption, input);
-    elements.dialog.append(label);
+    elements.action.before(label);
     input.__field = label;
     return input;
   }
@@ -188,7 +188,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
 
     otherControls.append(pickerButton, selectedLabel, manualButton, usernameInput);
     field.append(label, otherControls);
-    elements.dialog.append(field);
+    elements.action.before(field);
     return { field, mode, otherControls, pickerButton, selectedLabel, manualButton, usernameInput, resetOther };
   }
 

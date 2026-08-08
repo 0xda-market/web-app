@@ -83,7 +83,7 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     input.value = "1";
     input.setAttribute("aria-label", i18n.t("checkout.quantity"));
     label.append(caption, input);
-    elements.dialog.append(label);
+    elements.action.before(label);
     input.__field = label;
     return input;
   }
@@ -102,16 +102,33 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     const self = document.createElement("option");
     self.value = "self";
     self.textContent = recipientCopy.self;
-    const username = document.createElement("option");
-    username.value = "username";
-    username.textContent = recipientCopy.usernameMode;
-    mode.append(self, username);
+    const other = document.createElement("option");
+    other.value = "username";
+    other.textContent = recipientCopy.other;
+    mode.append(self, other);
     label.append(caption, mode);
 
-    const usernameLabel = document.createElement("label");
-    usernameLabel.hidden = true;
-    const usernameCaption = document.createElement("span");
-    usernameCaption.textContent = recipientCopy.username;
+    const otherControls = document.createElement("div");
+    otherControls.className = "checkout-recipient-other";
+    otherControls.hidden = true;
+
+    const pickerButton = document.createElement("button");
+    pickerButton.type = "button";
+    pickerButton.className = "checkout-recipient-picker";
+    pickerButton.textContent = recipientCopy.choose;
+    pickerButton.hidden = typeof host.pickRecipient !== "function";
+
+    const selectedLabel = document.createElement("div");
+    selectedLabel.className = "checkout-recipient-selected";
+    selectedLabel.hidden = true;
+    selectedLabel.setAttribute("aria-live", "polite");
+
+    const manualButton = document.createElement("button");
+    manualButton.type = "button";
+    manualButton.className = "checkout-recipient-manual";
+    manualButton.textContent = recipientCopy.manual;
+    manualButton.hidden = typeof host.pickRecipient !== "function";
+
     const usernameInput = document.createElement("input");
     usernameInput.id = "checkout-recipient-username";
     usernameInput.name = "recipient_username";
@@ -119,20 +136,60 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     usernameInput.inputMode = "text";
     usernameInput.autocomplete = "off";
     usernameInput.placeholder = "@username";
-    usernameInput.setAttribute("aria-label", recipientCopy.username);
-    usernameLabel.append(usernameCaption, usernameInput);
+    usernameInput.setAttribute("aria-label", recipientCopy.manual);
+    usernameInput.hidden = typeof host.pickRecipient === "function";
+    usernameInput.disabled = true;
+
+    function resetOther() {
+      usernameInput.value = "";
+      selectedLabel.textContent = "";
+      selectedLabel.hidden = true;
+      pickerButton.textContent = recipientCopy.choose;
+      usernameInput.hidden = typeof host.pickRecipient === "function";
+      manualButton.hidden = typeof host.pickRecipient !== "function";
+    }
 
     mode.addEventListener("change", () => {
-      const requiresUsername = mode.value === "username";
-      usernameLabel.hidden = !requiresUsername;
-      usernameInput.disabled = !requiresUsername;
-      usernameInput.required = requiresUsername;
-      if (!requiresUsername) usernameInput.value = "";
+      const requiresRecipient = mode.value === "username";
+      otherControls.hidden = !requiresRecipient;
+      usernameInput.disabled = !requiresRecipient;
+      usernameInput.required = requiresRecipient;
+      if (!requiresRecipient) resetOther();
     });
 
-    field.append(label, usernameLabel);
-    elements.dialog.append(field);
-    return { field, mode, usernameLabel, usernameInput };
+    manualButton.addEventListener("click", () => {
+      usernameInput.hidden = false;
+      manualButton.hidden = true;
+      usernameInput.focus?.();
+    });
+
+    pickerButton.addEventListener("click", async () => {
+      pickerButton.disabled = true;
+      try {
+        const recipient = await host.pickRecipient();
+        if (!recipient) return;
+        const username = String(recipient.username || "").trim().replace(/^@/, "");
+        if (!username) throw new Error("recipient username is required");
+        usernameInput.value = username;
+        usernameInput.hidden = true;
+        manualButton.hidden = false;
+        selectedLabel.textContent = recipient.name
+          ? `${recipient.name} · @${username}`
+          : `@${username}`;
+        selectedLabel.hidden = false;
+        pickerButton.textContent = recipientCopy.change;
+        host.selectionFeedback();
+      } catch (error) {
+        elements.dialogStatus.textContent = error.message;
+      } finally {
+        pickerButton.disabled = false;
+      }
+    });
+
+    otherControls.append(pickerButton, selectedLabel, manualButton, usernameInput);
+    field.append(label, otherControls);
+    elements.action.before(field);
+    return { field, mode, otherControls, pickerButton, selectedLabel, manualButton, usernameInput, resetOther };
   }
 
   elements.quantity = checkoutQuantityControl();
@@ -222,6 +279,8 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     elements.quantity.disabled = !editable || engine.purchasePolicy(selectedProduct).single;
     elements.recipient.mode.disabled = !editable;
     elements.recipient.usernameInput.disabled = !editable || elements.recipient.mode.value !== "username";
+    elements.recipient.pickerButton.disabled = !editable;
+    elements.recipient.manualButton.disabled = !editable;
   }
 
   function openCheckout(product) {
@@ -232,9 +291,10 @@ export function createMarketApp({ host, transport, engine = bundledEngine, docum
     elements.quantity.__field.hidden = policy.single;
     elements.recipient.field.hidden = !policy.recipient;
     elements.recipient.mode.value = "self";
-    elements.recipient.usernameLabel.hidden = true;
-    elements.recipient.usernameInput.value = "";
+    elements.recipient.otherControls.hidden = true;
     elements.recipient.usernameInput.disabled = true;
+    elements.recipient.usernameInput.required = false;
+    elements.recipient.resetOther();
     elements.dialogCategory.textContent = i18n.category(product.category.id, product.category.label);
     elements.dialogName.textContent = product.attributes.name;
     elements.dialogPrice.textContent = engine.formatPrice(product) || i18n.t("catalog.unavailable");
